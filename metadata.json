@@ -1,0 +1,6 @@
+{
+  "name": "Eli Tracker",
+  "description": "Mobiele baby tracking app voor Eli: voedingen, pampers en groei bijhouden via Google Sheets.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
