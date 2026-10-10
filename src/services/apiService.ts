@@ -1,7 +1,8 @@
-import { BabyEntry, NewEntryPayload } from '../types';
+import { BabyEntry, NewEntryPayload, SleepSession } from '../types';
 import { getActiveApiUrl } from '../config/apiConfig';
 import { generateDemoData } from '../data/demoData';
 import { formatBelgianDate, normalizeRecord } from '../utils/normalization';
+import { normalizeSleepRecord } from '../utils/sleep';
 
 export interface ApiResponse<T> {
   success: boolean;
@@ -12,6 +13,10 @@ export interface ApiResponse<T> {
 
 // In-memory cache for demo entries so users can create and see entries live in demo mode
 let localDemoEntries: BabyEntry[] | null = null;
+
+export interface SleepSaveResult {
+  id?: string;
+}
 
 /**
  * Fetches all entries from Google Apps Script Web App endpoint or falls back to demo data
@@ -220,4 +225,147 @@ export async function createNewEntry(payload: NewEntryPayload): Promise<ApiRespo
       isDemo: false,
     };
   }
+}
+
+function apiUrlForAction(action: string): string {
+  const apiUrl = getActiveApiUrl();
+  if (!apiUrl) return '';
+  const separator = apiUrl.includes('?') ? '&' : '?';
+  return `${apiUrl}${separator}action=${encodeURIComponent(action)}`;
+}
+
+function extractSleepRows(payload: unknown): unknown[] {
+  const data = payload as { data?: unknown; records?: unknown; sleep?: unknown } | unknown[];
+  const rows = Array.isArray(data)
+    ? data
+    : Array.isArray(data?.data)
+      ? data.data
+      : Array.isArray(data?.records)
+        ? data.records
+        : Array.isArray(data?.sleep)
+          ? data.sleep
+          : [];
+
+  // Apps Script getSleep returns an array with its header as the first row.
+  if (Array.isArray(rows[0]) && String(rows[0][0] || '').trim().toLowerCase() === 'id') {
+    return rows.slice(1);
+  }
+  return rows;
+}
+
+/** Fetches rows from the dedicated Slaap sheet without changing the original feed API. */
+export async function fetchAllSleepSessions(): Promise<ApiResponse<SleepSession[]>> {
+  const url = apiUrlForAction('getSleep');
+  if (!url) {
+    return { success: true, data: [], isDemo: true };
+  }
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      throw new Error(`HTTP fout: ${response.status} ${response.statusText}`);
+    }
+
+    const json = await response.json();
+    if (json && typeof json === 'object' && (json as { success?: boolean }).success === false) {
+      throw new Error((json as { error?: string }).error || 'De slaapgegevens konden niet worden opgehaald');
+    }
+    if (json && typeof json === 'object' && (json as { status?: string }).status === 'error') {
+      throw new Error((json as { message?: string }).message || 'De slaapgegevens konden niet worden opgehaald');
+    }
+
+    const sessions = extractSleepRows(json)
+      .map((row, index) => normalizeSleepRecord(row, index))
+      .filter((session): session is SleepSession => Boolean(session))
+      .sort((a, b) => b.start.getTime() - a.start.getTime());
+
+    return { success: true, data: sessions, isDemo: false };
+  } catch (err) {
+    console.error('Fout bij ophalen van slaapgegevens:', err);
+    return {
+      success: false,
+      error: 'Kon de slaapgegevens niet laden. Probeer opnieuw wanneer je verbinding hersteld is.',
+      isDemo: false,
+    };
+  }
+}
+
+async function saveSleepAction(payload: Record<string, unknown>): Promise<ApiResponse<SleepSaveResult>> {
+  const apiUrl = getActiveApiUrl();
+  if (!apiUrl) {
+    return { success: false, error: 'Slaap registreren is niet beschikbaar in demo modus.', isDemo: true };
+  }
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
+    const responseText = await response.text();
+    let result: { success?: boolean; status?: string; error?: string; message?: string; id?: string } | null = null;
+    try {
+      result = responseText ? JSON.parse(responseText) : null;
+    } catch {
+      // A successful action must return JSON. Treat a non-JSON body as uncertain,
+      // rather than pretending a Google Apps Script HTTP 200 saved it.
+      throw new Error('Geen geldige bevestiging van de slaapserver ontvangen');
+    }
+
+    if (!response.ok) {
+      throw new Error(result?.error || result?.message || `HTTP fout: ${response.status}`);
+    }
+    // Apps Script can return HTTP 200 with success:false, so inspect the body as well.
+    if (!result || result.success === false || result.status === 'error') {
+      throw new Error(result?.error || result?.message || 'De slaapactie werd niet bevestigd door de server');
+    }
+
+    return { success: true, data: { id: result.id }, isDemo: false };
+  } catch (err: any) {
+    console.error('Fout bij opslaan van slaapgegevens:', err);
+    return {
+      success: false,
+      error: err?.message || 'De slaapperiode kon niet worden opgeslagen. Probeer opnieuw.',
+      isDemo: false,
+    };
+  }
+}
+
+export function startSleep(start: Date, remarks = ''): Promise<ApiResponse<SleepSaveResult>> {
+  return saveSleepAction({
+    action: 'startSleep',
+    starttijd: start.toISOString(),
+    opmerkingen: remarks,
+  });
+}
+
+export function stopSleep(id: string, end: Date, remarks = ''): Promise<ApiResponse<SleepSaveResult>> {
+  return saveSleepAction({
+    action: 'stopSleep',
+    id,
+    eindtijd: end.toISOString(),
+    opmerkingen: remarks,
+  });
+}
+
+export function addSleep(start: Date, end: Date, remarks = ''): Promise<ApiResponse<SleepSaveResult>> {
+  return saveSleepAction({
+    action: 'addSleep',
+    starttijd: start.toISOString(),
+    eindtijd: end.toISOString(),
+    opmerkingen: remarks,
+  });
 }

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { EntryCategory, NewEntryPayload, SolidFoodSubtype } from '../types';
+import { EntryCategory, NewEntryPayload, SleepSession, SolidFoodSubtype } from '../types';
 import { createNewEntry } from '../services/apiService';
+import { SleepTracker } from './SleepTracker';
 import confetti from 'canvas-confetti';
 import {
   Calendar,
@@ -18,12 +19,18 @@ interface EntryFormProps {
   initialCategory?: EntryCategory;
   onEntrySaved: () => void;
   onCancel?: () => void;
+  sleepSessions: SleepSession[];
+  onSleepChanged: () => void | Promise<void>;
+  isSleepLoading?: boolean;
 }
 
 export const EntryForm: React.FC<EntryFormProps> = ({
   initialCategory,
   onEntrySaved,
   onCancel,
+  sleepSessions,
+  onSleepChanged,
+  isSleepLoading,
 }) => {
   // Category selection: Melk | Vaste voeding | Pamper | Gewicht
   const [category, setCategory] = useState<EntryCategory | null>(initialCategory || null);
@@ -144,6 +151,12 @@ export const EntryForm: React.FC<EntryFormProps> = ({
 
   return (
     <div id="entry-form-container" className="space-y-4 max-w-md mx-auto">
+      <SleepTracker
+        sleepSessions={sleepSessions}
+        onSleepChanged={onSleepChanged}
+        isLoading={isSleepLoading}
+      />
+
       {/* Category Selector if none picked */}
       {!category ? (
         <div className="space-y-4 pt-1 animate-in fade-in duration-200">

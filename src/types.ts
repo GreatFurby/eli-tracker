@@ -28,6 +28,17 @@ export interface BabyEntry {
   solidFoodSubtype: SolidFoodSubtype | null; // Voedingssubtype
 }
 
+/**
+ * A sleep session stored in the separate `Slaap` worksheet.
+ * An empty end time means Eli is still sleeping.
+ */
+export interface SleepSession {
+  id: string;
+  start: Date;
+  end: Date | null;
+  remarks: string;
+}
+
 export type EntryCategory = 'melk' | 'vaste_voeding' | 'pamper' | 'gewicht';
 
 export interface NewEntryPayload {

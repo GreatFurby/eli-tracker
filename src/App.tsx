@@ -4,9 +4,10 @@
  */
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { ActiveTab, BabyEntry, EntryCategory } from './types';
-import { fetchAllEntries } from './services/apiService';
+import { ActiveTab, BabyEntry, EntryCategory, SleepSession } from './types';
+import { fetchAllEntries, fetchAllSleepSessions } from './services/apiService';
 import { calculateTodayStats } from './utils/normalization';
+import { getActiveSleepSession } from './utils/sleep';
 import { Header } from './components/Header';
 import { Navigation } from './components/Navigation';
 import { TodaySummaryCards } from './components/TodaySummaryCards';
@@ -21,7 +22,9 @@ import { motion, AnimatePresence } from 'motion/react';
 export default function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('vandaag');
   const [entries, setEntries] = useState<BabyEntry[]>([]);
+  const [sleepSessions, setSleepSessions] = useState<SleepSession[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isSleepLoading, setIsSleepLoading] = useState<boolean>(true);
   const [isDemo, setIsDemo] = useState<boolean>(true);
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
@@ -35,20 +38,29 @@ export default function App() {
     }
     setErrorMessage('');
 
-    const res = await fetchAllEntries();
+    const [entryResult, sleepResult] = await Promise.all([
+      fetchAllEntries(),
+      fetchAllSleepSessions(),
+    ]);
 
-    if (res.success && res.data) {
-      setEntries(res.data);
-      setIsDemo(Boolean(res.isDemo));
+    const errors: string[] = [];
+    if (entryResult.success && entryResult.data) {
+      setEntries(entryResult.data);
+      setIsDemo(Boolean(entryResult.isDemo));
       setLastRefreshedAt(new Date());
     } else {
-      setErrorMessage(
-        res.error ||
-          'Kon de gegevens niet laden. Controleer je internetverbinding en probeer opnieuw.'
-      );
+      errors.push(entryResult.error || 'Kon de voedings- en pampergegevens niet laden.');
     }
 
+    if (sleepResult.success && sleepResult.data) {
+      setSleepSessions(sleepResult.data);
+    } else {
+      errors.push(sleepResult.error || 'Kon de slaapgegevens niet laden.');
+    }
+
+    if (errors.length) setErrorMessage(errors.join(' '));
     setIsLoading(false);
+    setIsSleepLoading(false);
   }, []);
 
   // Initial load
@@ -78,6 +90,8 @@ export default function App() {
   const todayStats = useMemo(() => {
     return calculateTodayStats(entries);
   }, [entries]);
+
+  const activeSleep = useMemo(() => getActiveSleepSession(sleepSessions), [sleepSessions]);
 
   // Quick Action Jump to Ingave with preselected category
   const handleQuickAdd = (category?: EntryCategory) => {
@@ -160,6 +174,8 @@ export default function App() {
                 <TodaySummaryCards
                   stats={todayStats}
                   onQuickAdd={handleQuickAdd}
+                  activeSleep={activeSleep}
+                  onOpenSleep={() => handleQuickAdd()}
                 />
                 <TodayTimeline
                   entries={todayStats.timelineToday}
@@ -180,6 +196,9 @@ export default function App() {
                 <EntryForm
                   initialCategory={initialCategory}
                   onEntrySaved={handleEntrySaved}
+                  sleepSessions={sleepSessions}
+                  onSleepChanged={() => loadData(true)}
+                  isSleepLoading={isSleepLoading}
                   onCancel={() => {
                     setInitialCategory(undefined);
                     setActiveTab('vandaag');
@@ -199,6 +218,7 @@ export default function App() {
               >
                 <HistoryList
                   entries={entries}
+                  sleepSessions={sleepSessions}
                   onOpenIngave={() => handleQuickAdd()}
                 />
               </motion.div>
@@ -213,7 +233,7 @@ export default function App() {
                 exit={{ opacity: 0, y: -6 }}
                 transition={{ duration: 0.18 }}
               >
-                <GrowthCharts entries={entries} />
+                <GrowthCharts entries={entries} sleepSessions={sleepSessions} />
               </motion.div>
             )}
           </AnimatePresence>

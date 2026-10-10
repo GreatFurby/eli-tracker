@@ -1,16 +1,21 @@
 import React from 'react';
-import { TodayStats } from '../types';
+import { SleepSession, TodayStats } from '../types';
 import { getDiaperUiInfo } from '../utils/normalization';
-import { Clock, TrendingUp, Sparkles, Scale, Utensils, Baby } from 'lucide-react';
+import { formatDuration, formatLocalTime, getSleepMinutes } from '../utils/sleep';
+import { Clock, TrendingUp, Scale, Moon } from 'lucide-react';
 
 interface TodaySummaryCardsProps {
   stats: TodayStats;
   onQuickAdd: (category: 'melk' | 'vaste_voeding' | 'pamper' | 'gewicht') => void;
+  activeSleep: SleepSession | null;
+  onOpenSleep: () => void;
 }
 
 export const TodaySummaryCards: React.FC<TodaySummaryCardsProps> = ({
   stats,
   onQuickAdd,
+  activeSleep,
+  onOpenSleep,
 }) => {
   const { lastMilk, milkToday, solidFoodToday, lastDiaper, lastWeight } = stats;
 
@@ -18,6 +23,30 @@ export const TodaySummaryCards: React.FC<TodaySummaryCardsProps> = ({
 
   return (
     <section id="today-summary-section" aria-label="Overzicht Vandaag" className="space-y-3">
+      {activeSleep && (
+        <button
+          id="today-active-sleep-card"
+          type="button"
+          onClick={onOpenSleep}
+          className="w-full text-left p-4 rounded-2xl border border-indigo-200 bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-200/60 active:scale-[0.99] transition-all"
+        >
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <span className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center">
+                <Moon className="w-5 h-5" />
+              </span>
+              <div>
+                <div className="text-sm font-black">Eli slaapt nu</div>
+                <div className="text-xs text-indigo-100 mt-0.5">
+                  Sinds {formatLocalTime(activeSleep.start)} · {formatDuration(getSleepMinutes(activeSleep))}
+                </div>
+              </div>
+            </div>
+            <span className="text-[11px] font-bold bg-white/15 px-2.5 py-1.5 rounded-xl">Stop slaap</span>
+          </div>
+        </button>
+      )}
+
       {/* 2-Column Grid for Primary Quick Stats */}
       <div className="grid grid-cols-2 gap-3">
         {/* CARD 1: Laatste melkvoeding */}

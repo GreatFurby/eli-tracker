@@ -1,20 +1,40 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# Eli Tracker 2.1
 
-# Run and deploy your AI Studio app
+Dutch, mobile-first tracker for Eli's milk, solid food, diapers, weight and sleep. It is a React + TypeScript + Vite app deployed through GitHub Pages, with Google Apps Script and Google Sheets as the shared backend.
 
-This contains everything you need to run your app locally.
+## What changed in v2.1
 
-View your app in AI Studio: https://ai.studio/apps/830f9cd4-5be3-4c53-8893-fd493a386c7e
+- Sleep tracking on **Ingave**: start, stop and retrospectively add a sleep period.
+- Shared active-sleep state for both parents, with automatic refresh on app visibility and every minute.
+- Sleep periods in **Historiek**, including correctly split overnight periods.
+- Compact daily summaries plus **Dagoverzicht | Weekoverzicht** (ISO weeks, Monday–Sunday).
+- New **Slaap** and **Pampers** charts in **Groei**.
+- Mixed diapers count once in totals, while their own category remains visible.
+- The settings modal no longer exposes the outdated pre-v2.1 Apps Script template.
 
-## Run Locally
+The existing `Formulierreacties 1` worksheet and historical rows are only read by the app and remain unchanged. Sleep data uses the separate `Slaap` worksheet through the already deployed Eli Tracker API v2.1.
 
-**Prerequisites:**  Node.js
+## Run locally
 
+```bash
+npm install
+npm run test:sleep
+npm run lint
+npm run build
+```
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+The local dev server is available through:
+
+```bash
+npm run dev
+```
+
+## Deploy
+
+The included GitHub Actions workflow builds and deploys automatically when these files are pushed to the `main` branch. Keep the Vite base path `/eli-tracker/` unchanged for GitHub Pages.
+
+No Apps Script deployment is required for this release: it uses the supplied API v2.1 sleep endpoints.
+
+## Privacy note
+
+The Google Apps Script web-app URL is public to anyone who knows it. Do not share the URL outside the two people who should use the tracker.

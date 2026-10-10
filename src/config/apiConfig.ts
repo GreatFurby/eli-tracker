@@ -15,6 +15,7 @@ export const GOOGLE_APPS_SCRIPT_WEBAPP_URL: string = "https://script.google.com/
 export const GOOGLE_SHEET_CONFIG = {
   spreadsheetId: "1s-mnu1hrMW-XompWT0JnJe-Aqcob74Du_-XGgDSG018",
   worksheetName: "Formulierreacties 1",
+  sleepWorksheetName: "Slaap",
   columns: [
     "Tijdstempel",
     "Datum",
@@ -59,7 +60,9 @@ export function setCustomApiUrl(url: string): void {
 }
 
 /**
- * Google Apps Script (Code.gs) template code to paste into Google Sheet > Extensions > Apps Script
+ * Legacy pre-v2.1 template retained only for source-history compatibility.
+ * It is deliberately not exposed in the UI: it does not include the Slaap API.
+ * Do not paste or deploy it over the existing Eli Tracker API v2.1 backend.
  */
 export const GOOGLE_APPS_SCRIPT_TEMPLATE = `/**
  * Eli Tracker - Google Apps Script Backend

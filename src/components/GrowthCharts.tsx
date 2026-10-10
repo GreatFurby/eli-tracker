@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { BabyEntry } from '../types';
+import { BabyEntry, SleepSession } from '../types';
 import { formatBelgianDate } from '../utils/normalization';
+import { buildDailySummaries, formatDuration } from '../utils/sleep';
 import {
   ResponsiveContainer,
   LineChart,
@@ -15,15 +16,16 @@ import {
   Area,
   AreaChart,
 } from 'recharts';
-import { Scale, TrendingUp, Milk, Utensils, Activity, Calendar } from 'lucide-react';
+import { Moon } from 'lucide-react';
 
 interface GrowthChartsProps {
   entries: BabyEntry[];
+  sleepSessions: SleepSession[];
 }
 
-type GrowthTab = 'gewicht' | 'melk' | 'vaste_voeding' | 'ontwikkeling';
+type GrowthTab = 'gewicht' | 'melk' | 'vaste_voeding' | 'ontwikkeling' | 'slaap' | 'pampers';
 
-export const GrowthCharts: React.FC<GrowthChartsProps> = ({ entries }) => {
+export const GrowthCharts: React.FC<GrowthChartsProps> = ({ entries, sleepSessions }) => {
   const [activeSubTab, setActiveSubTab] = useState<GrowthTab>('gewicht');
 
   // ==========================================
@@ -189,6 +191,55 @@ export const GrowthCharts: React.FC<GrowthChartsProps> = ({ entries }) => {
     });
   }, [entries]);
 
+  // ==========================================
+  // 5. DAILY SLEEP AND DIAPER DATA
+  // ==========================================
+  const dailySummaries = useMemo(
+    () => buildDailySummaries(entries, sleepSessions),
+    [entries, sleepSessions],
+  );
+
+  const dailySleepData = useMemo(() => {
+    return dailySummaries
+      .filter((day) => day.sleepMinutes > 0)
+      .slice(-21)
+      .map((day) => ({
+        ...day,
+        displayDate: formatBelgianDate(day.date).substring(0, 5),
+        hours: Number((day.sleepMinutes / 60).toFixed(2)),
+      }));
+  }, [dailySummaries]);
+
+  const sleepStats = useMemo(() => {
+    if (dailySleepData.length === 0) return null;
+    const totalMinutes = dailySleepData.reduce((total, day) => total + day.sleepMinutes, 0);
+    return {
+      averageMinutes: Math.round(totalMinutes / dailySleepData.length),
+      daysTracked: dailySleepData.length,
+      hasOngoingSleep: dailySleepData.some((day) => day.hasOngoingSleep),
+    };
+  }, [dailySleepData]);
+
+  const dailyDiaperData = useMemo(() => {
+    return dailySummaries
+      .filter((day) => day.diaperCount > 0)
+      .slice(-21)
+      .map((day) => ({
+        ...day,
+        displayDate: formatBelgianDate(day.date).substring(0, 5),
+      }));
+  }, [dailySummaries]);
+
+  const diaperStats = useMemo(() => {
+    if (dailyDiaperData.length === 0) return null;
+    const total = dailyDiaperData.reduce((sum, day) => sum + day.diaperCount, 0);
+    return {
+      average: Number((total / dailyDiaperData.length).toFixed(1)),
+      total,
+      daysTracked: dailyDiaperData.length,
+    };
+  }, [dailyDiaperData]);
+
   return (
     <section id="growth-charts-section" className="space-y-4 max-w-md mx-auto">
       {/* Section Title */}
@@ -198,7 +249,7 @@ export const GrowthCharts: React.FC<GrowthChartsProps> = ({ entries }) => {
       </div>
 
       {/* SUB-TABS */}
-      <div className="grid grid-cols-4 gap-1 p-1 bg-slate-100/90 rounded-2xl border border-slate-200">
+      <div className="grid grid-cols-3 gap-1 p-1 bg-slate-100/90 rounded-2xl border border-slate-200">
         <button
           type="button"
           onClick={() => setActiveSubTab('gewicht')}
@@ -242,6 +293,28 @@ export const GrowthCharts: React.FC<GrowthChartsProps> = ({ entries }) => {
           }`}
         >
           📈 Evolutie
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveSubTab('slaap')}
+          className={`py-2 text-[11px] font-bold rounded-xl transition-all ${
+            activeSubTab === 'slaap'
+              ? 'bg-white text-slate-900 shadow-xs'
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          🌙 Slaap
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveSubTab('pampers')}
+          className={`py-2 text-[11px] font-bold rounded-xl transition-all ${
+            activeSubTab === 'pampers'
+              ? 'bg-white text-slate-900 shadow-xs'
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          🩲 Pampers
         </button>
       </div>
 
@@ -604,6 +677,119 @@ export const GrowthCharts: React.FC<GrowthChartsProps> = ({ entries }) => {
               Melk en vaste voeding worden apart weergegeven om een zuiver beeld van Eli&apos;s overgang te bewaren.
             </p>
           </div>
+        </div>
+      )}
+
+      {/* 5. SLAAP TAB */}
+      {activeSubTab === 'slaap' && (
+        <div className="space-y-3 animate-in fade-in duration-200">
+          {sleepStats ? (
+            <div className="grid grid-cols-2 gap-2.5">
+              <div className="p-3.5 rounded-2xl bg-white border border-indigo-100 shadow-xs">
+                <div className="text-[10px] font-bold text-indigo-800 uppercase tracking-wider">Gemiddelde slaap</div>
+                <div className="text-xl font-black text-slate-900 mt-0.5">{formatDuration(sleepStats.averageMinutes)}</div>
+                <div className="text-[11px] text-slate-500 font-medium">Over {sleepStats.daysTracked} geregistreerde dagen</div>
+              </div>
+              <div className="p-3.5 rounded-2xl bg-white border border-indigo-100 shadow-xs">
+                <div className="text-[10px] font-bold text-indigo-800 uppercase tracking-wider">Per dag</div>
+                <div className="text-xl font-black text-indigo-700 mt-0.5">🌙 slaap</div>
+                <div className="text-[11px] text-slate-500 font-medium">Sessie(s) worden op de juiste dag verdeeld</div>
+              </div>
+            </div>
+          ) : (
+            <div className="p-5 rounded-2xl bg-white border border-slate-200 text-center">
+              <Moon className="w-7 h-7 mx-auto text-indigo-300 mb-2" />
+              <p className="text-sm font-semibold text-slate-700">Nog geen slaapgegevens</p>
+              <p className="text-xs text-slate-400 mt-1">Registreer Eli&apos;s eerste slaapperiode bij Ingave.</p>
+            </div>
+          )}
+
+          {dailySleepData.length > 0 && (
+            <div className="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-xs space-y-2">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                <div>
+                  <span className="text-xs font-bold text-slate-800 block">Totale slaap per dag</span>
+                  <span className="text-[10px] text-slate-400">Laatste 21 dagen met slaapregistraties</span>
+                </div>
+                <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-1 rounded-lg">uren</span>
+              </div>
+              <div className="h-64 w-full pt-2">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={dailySleepData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="sleepGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#6366f1" stopOpacity={0.32} />
+                        <stop offset="95%" stopColor="#6366f1" stopOpacity={0.02} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                    <XAxis dataKey="displayDate" tick={{ fontSize: 9, fill: '#64748b' }} tickLine={false} />
+                    <YAxis tick={{ fontSize: 10, fill: '#64748b' }} tickLine={false} axisLine={false} />
+                    <Tooltip content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0].payload;
+                        return <div className="p-2.5 bg-slate-900 text-white rounded-xl text-xs space-y-1 shadow-lg"><div className="font-bold">{formatBelgianDate(data.date)}</div><div className="text-indigo-300 font-mono font-bold">🌙 {formatDuration(data.sleepMinutes)}</div>{data.hasOngoingSleep && <div className="text-[10px] text-indigo-200">Bevat lopende slaap tot nu</div>}</div>;
+                      }
+                      return null;
+                    }} />
+                    <Area type="monotone" dataKey="hours" stroke="#4f46e5" strokeWidth={3} fill="url(#sleepGradient)" dot={{ fill: '#4f46e5', stroke: '#fff', strokeWidth: 2, r: 3 }} activeDot={{ r: 5 }} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+              {sleepStats?.hasOngoingSleep && <p className="text-[10px] text-indigo-700 text-center font-semibold">De huidige dag bevat een lopende slaapperiode tot nu, geen voltooid totaal.</p>}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 6. PAMPERS TAB */}
+      {activeSubTab === 'pampers' && (
+        <div className="space-y-3 animate-in fade-in duration-200">
+          {diaperStats ? (
+            <div className="grid grid-cols-2 gap-2.5">
+              <div className="p-3.5 rounded-2xl bg-white border border-amber-100 shadow-xs">
+                <div className="text-[10px] font-bold text-amber-800 uppercase tracking-wider">Gemiddeld per dag</div>
+                <div className="text-xl font-black text-slate-900 mt-0.5">{String(diaperStats.average).replace('.', ',')}</div>
+                <div className="text-[11px] text-slate-500 font-medium">Over {diaperStats.daysTracked} dagen</div>
+              </div>
+              <div className="p-3.5 rounded-2xl bg-white border border-amber-100 shadow-xs">
+                <div className="text-[10px] font-bold text-amber-800 uppercase tracking-wider">Totaal</div>
+                <div className="text-xl font-black text-amber-700 mt-0.5">{diaperStats.total}</div>
+                <div className="text-[11px] text-slate-500 font-medium">Elke gemengde pamper telt één keer</div>
+              </div>
+            </div>
+          ) : (
+            <div className="p-5 rounded-2xl bg-white border border-slate-200 text-center"><p className="text-sm font-semibold text-slate-700">Nog geen pampergegevens</p><p className="text-xs text-slate-400 mt-1">Nieuwe pamperregistraties verschijnen hier per dag.</p></div>
+          )}
+
+          {dailyDiaperData.length > 0 && (
+            <div className="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-xs space-y-2">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                <div><span className="text-xs font-bold text-slate-800 block">Pampers per dag</span><span className="text-[10px] text-slate-400">Laatste 21 dagen met registraties</span></div>
+                <div className="flex items-center gap-1.5 text-[9px] font-semibold text-slate-500"><span>💧 pipi</span><span>💩 kaka</span><span>✨ proper</span></div>
+              </div>
+              <div className="h-64 w-full pt-2">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={dailyDiaperData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                    <XAxis dataKey="displayDate" tick={{ fontSize: 9, fill: '#64748b' }} tickLine={false} />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: '#64748b' }} tickLine={false} axisLine={false} />
+                    <Tooltip content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0].payload;
+                        return <div className="p-2.5 bg-slate-900 text-white rounded-xl text-xs space-y-1 shadow-lg"><div className="font-bold">{formatBelgianDate(data.date)}</div><div className="text-amber-300 font-mono font-bold">🩲 {data.diaperCount} totaal</div>{data.diaperPipi > 0 && <div className="text-[10px] text-slate-300">💧 Pipi: {data.diaperPipi}</div>}{data.diaperKaka > 0 && <div className="text-[10px] text-slate-300">💩 Kaka: {data.diaperKaka}</div>}{data.diaperMixed > 0 && <div className="text-[10px] text-slate-300">💧💩 Gemengd: {data.diaperMixed}</div>}{data.diaperClean > 0 && <div className="text-[10px] text-slate-300">✨ Proper: {data.diaperClean}</div>}</div>;
+                      }
+                      return null;
+                    }} />
+                    <Bar dataKey="diaperPipi" stackId="diapers" fill="#38bdf8" />
+                    <Bar dataKey="diaperKaka" stackId="diapers" fill="#b45309" />
+                    <Bar dataKey="diaperMixed" stackId="diapers" fill="#14b8a6" />
+                    <Bar dataKey="diaperClean" stackId="diapers" fill="#94a3b8" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </section>

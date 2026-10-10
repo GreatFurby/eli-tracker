@@ -1,21 +1,16 @@
 import React, { useState } from 'react';
 import {
   X,
-  Copy,
-  Check,
   ExternalLink,
   Save,
   Trash2,
-  HelpCircle,
-  Sparkles,
+  Info,
   Sheet,
 } from 'lucide-react';
 import {
   getActiveApiUrl,
   setCustomApiUrl,
   GOOGLE_SHEET_CONFIG,
-  GOOGLE_APPS_SCRIPT_TEMPLATE,
-  GOOGLE_APPS_SCRIPT_WEBAPP_URL,
 } from '../config/apiConfig';
 
 interface ApiConfigModalProps {
@@ -30,22 +25,10 @@ export const ApiConfigModal: React.FC<ApiConfigModalProps> = ({
   onConfigSaved,
 }) => {
   const [urlInput, setUrlInput] = useState<string>(() => getActiveApiUrl());
-  const [copied, setCopied] = useState<boolean>(false);
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [testMessage, setTestMessage] = useState<string>('');
-  const [showCode, setShowCode] = useState<boolean>(false);
 
   if (!isOpen) return null;
-
-  const handleCopyCode = async () => {
-    try {
-      await navigator.clipboard.writeText(GOOGLE_APPS_SCRIPT_TEMPLATE);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2500);
-    } catch (err) {
-      console.error('Kopiëren mislukt:', err);
-    }
-  };
 
   const handleTestAndSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -160,7 +143,7 @@ export const ApiConfigModal: React.FC<ApiConfigModalProps> = ({
               ID: {GOOGLE_SHEET_CONFIG.spreadsheetId}
             </p>
             <p className="text-sky-800/80">
-              Werkblad: <span className="font-semibold">{GOOGLE_SHEET_CONFIG.worksheetName}</span> (11 kolommen)
+              Werkbladen: <span className="font-semibold">{GOOGLE_SHEET_CONFIG.worksheetName}</span> + <span className="font-semibold">{GOOGLE_SHEET_CONFIG.sleepWorksheetName}</span>
             </p>
           </div>
 
@@ -221,60 +204,12 @@ export const ApiConfigModal: React.FC<ApiConfigModalProps> = ({
             </div>
           </form>
 
-          {/* Quick Setup Instructions Collapsible */}
-          <div className="border-t border-slate-100 pt-4 space-y-2.5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                <HelpCircle className="w-4 h-4 text-teal-600" />
-                Hoe koppel je de Google Sheet in 3 stappen?
-              </span>
-              <button
-                type="button"
-                onClick={() => setShowCode(!showCode)}
-                className="text-xs text-sky-600 font-semibold hover:underline"
-              >
-                {showCode ? 'Verberg script' : 'Toon script'}
-              </button>
+          <div className="border-t border-slate-100 pt-4">
+            <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-900 space-y-1.5">
+              <div className="font-bold flex items-center gap-1.5"><Info className="w-4 h-4" /> API v2.1 is al ingesteld</div>
+              <p>Gebruik hier enkel de bestaande Eli Tracker API v2.1-URL. De oude kopieerbare Apps Script-code is bewust verborgen, zodat slaaptracking niet per ongeluk door een verouderd script wordt overschreven.</p>
+              <p className="text-amber-800/85">Let op: de Apps Script-webapp is publiek bereikbaar voor wie de URL kent. Deel de URL dus niet buiten jullie twee.</p>
             </div>
-
-            <ol className="text-xs text-slate-600 space-y-2 list-decimal list-inside pl-1 bg-slate-50 p-3.5 rounded-2xl border border-slate-200/70">
-              <li>
-                Open je Google Sheet, ga naar <span className="font-semibold text-slate-800">Extensies &gt; Apps Script</span>.
-              </li>
-              <li>
-                Plak onderstaande code in <code className="bg-slate-200 px-1 py-0.5 rounded text-[11px]">Code.gs</code> en klik op 💾 Opslaan.
-              </li>
-              <li>
-                Klik op <span className="font-semibold text-slate-800">Implementeren &gt; Nieuwe implementatie</span>:
-                <div className="pl-4 pt-1 text-[11px] text-slate-500 space-y-0.5">
-                  <div>• Type: <span className="font-medium text-slate-700">Web-app</span></div>
-                  <div>• Uitvoeren als: <span className="font-medium text-slate-700">Ikzelf</span></div>
-                  <div>• Wie heeft toegang: <span className="font-medium text-slate-700">Iedereen</span></div>
-                </div>
-              </li>
-              <li>Kopieer de Web-app URL en plak deze hierboven.</li>
-            </ol>
-
-            {/* Ready-to-copy code box */}
-            {showCode && (
-              <div className="space-y-2 animate-in fade-in duration-150">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-mono text-slate-500">Code.gs</span>
-                  <button
-                    type="button"
-                    onClick={handleCopyCode}
-                    id="copy-apps-script-btn"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-50 text-teal-700 border border-teal-200 hover:bg-teal-100 text-xs font-semibold transition-all"
-                  >
-                    {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                    {copied ? 'Gekopieerd!' : 'Kopieer Apps Script Code'}
-                  </button>
-                </div>
-                <pre className="p-3 bg-slate-900 text-slate-100 rounded-xl text-[11px] font-mono overflow-x-auto max-h-48 leading-relaxed">
-                  {GOOGLE_APPS_SCRIPT_TEMPLATE}
-                </pre>
-              </div>
-            )}
           </div>
         </div>
 
