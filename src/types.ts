@@ -26,6 +26,7 @@ export interface BabyEntry {
   feedingType: FeedingType | null; // Voedingstype (inferred as 'Melk' if milkMl is present and feedingType is blank)
   solidFoodGrams: number | null; // Hoeveelheid vaste voeding (g)
   solidFoodSubtype: SolidFoodSubtype | null; // Voedingssubtype
+  temperatureCelsius: number | null; // Temperatuur (°C)
 }
 
 /**
@@ -39,7 +40,7 @@ export interface SleepSession {
   remarks: string;
 }
 
-export type EntryCategory = 'melk' | 'vaste_voeding' | 'pamper' | 'gewicht';
+export type EntryCategory = 'melk' | 'vaste_voeding' | 'pamper' | 'gewicht' | 'temperatuur';
 
 export interface NewEntryPayload {
   category: EntryCategory;
@@ -50,6 +51,7 @@ export interface NewEntryPayload {
   solidFoodSubtype?: SolidFoodSubtype;
   diaper?: 'Pipi pamper' | 'Kaka pamper' | 'Pipi + kaka pamper';
   weightGrams?: number;
+  temperatureCelsius?: number;
   vomited?: boolean;
   remarks?: string;
 }
@@ -83,6 +85,12 @@ export interface TodayStats {
     date: string;
     dateTime: Date;
     diffFromPreviousGrams: number | null;
+  } | null;
+  lastTemperature: {
+    celsius: number;
+    time: string;
+    dateTime: Date;
+    timeAgo: string;
   } | null;
   timelineToday: BabyEntry[];
 }

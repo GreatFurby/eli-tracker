@@ -1,11 +1,11 @@
 import React from 'react';
-import { BabyEntry } from '../types';
-import { getDiaperUiInfo } from '../utils/normalization';
+import { BabyEntry, EntryCategory } from '../types';
+import { formatTemperatureCelsius, getDiaperUiInfo } from '../utils/normalization';
 import { Clock, AlertCircle, PlusCircle, MessageSquare } from 'lucide-react';
 
 interface TodayTimelineProps {
   entries: BabyEntry[];
-  onOpenIngave: (category?: 'melk' | 'vaste_voeding' | 'pamper' | 'gewicht') => void;
+  onOpenIngave: (category?: EntryCategory) => void;
 }
 
 export const TodayTimeline: React.FC<TodayTimelineProps> = ({
@@ -75,6 +75,13 @@ export const TodayTimeline: React.FC<TodayTimelineProps> = ({
             >
               🥣 Vaste voeding
             </button>
+            <button
+              type="button"
+              onClick={() => onOpenIngave('temperatuur')}
+              className="px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold border border-rose-200 transition-colors"
+            >
+              🌡️ Temperatuur
+            </button>
           </div>
         </div>
       ) : (
@@ -84,6 +91,7 @@ export const TodayTimeline: React.FC<TodayTimelineProps> = ({
             const isSolid = entry.feedingType === 'Vaste voeding' || (entry.solidFoodGrams && entry.solidFoodGrams > 0);
             const isDiaper = Boolean(entry.diaper);
             const isWeight = Boolean(entry.weightGrams && entry.weightGrams > 0);
+            const isTemperature = entry.temperatureCelsius !== null;
 
             const diaperInfo = isDiaper ? getDiaperUiInfo(entry.diaper) : null;
 
@@ -103,6 +111,9 @@ export const TodayTimeline: React.FC<TodayTimelineProps> = ({
             } else if (isWeight) {
               dotBg = 'bg-emerald-500';
               dotEmoji = '⚖️';
+            } else if (isTemperature) {
+              dotBg = 'bg-rose-500';
+              dotEmoji = '🌡️';
             }
 
             return (
@@ -151,6 +162,12 @@ export const TodayTimeline: React.FC<TodayTimelineProps> = ({
                       {isWeight && (
                         <span className="text-xs font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
                           ⚖️ {entry.weightGrams?.toLocaleString('nl-BE')} g gewogen
+                        </span>
+                      )}
+
+                      {isTemperature && (
+                        <span className="text-xs font-bold text-rose-800 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200">
+                          🌡️ {formatTemperatureCelsius(entry.temperatureCelsius as number)} gemeten
                         </span>
                       )}
                     </div>

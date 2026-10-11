@@ -28,6 +28,7 @@ export const GOOGLE_SHEET_CONFIG = {
     "Voedingstype",
     "Hoeveelheid vaste voeding (g)",
     "Voedingssubtype",
+    "Temperatuur (°C)",
   ] as const,
 };
 

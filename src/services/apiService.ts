@@ -100,6 +100,7 @@ export async function createNewEntry(payload: NewEntryPayload): Promise<ApiRespo
   // 9. Voedingstype
   // 10. Hoeveelheid vaste voeding (g)
   // 11. Voedingssubtype
+  // 12. Temperatuur (°C)
 
   const formattedBelgianDate = formatBelgianDate(payload.date);
   const formattedTime = payload.time;
@@ -110,6 +111,7 @@ export async function createNewEntry(payload: NewEntryPayload): Promise<ApiRespo
   let voedingssubtype: string = '';
   let pamper: string = '';
   let gewicht: number | null = null;
+  let temperatuur: number | null = null;
   let overgegeven: string = '';
 
   if (payload.category === 'melk') {
@@ -125,6 +127,8 @@ export async function createNewEntry(payload: NewEntryPayload): Promise<ApiRespo
     pamper = payload.diaper || '';
   } else if (payload.category === 'gewicht') {
     gewicht = payload.weightGrams || 0;
+  } else if (payload.category === 'temperatuur') {
+    temperatuur = payload.temperatureCelsius ?? null;
   }
 
   const postBody = {
@@ -138,6 +142,7 @@ export async function createNewEntry(payload: NewEntryPayload): Promise<ApiRespo
     voedingstype,
     vasteGram,
     voedingssubtype,
+    temperatuur,
   };
 
   // If in demo mode, simulate adding to in-memory demo data
@@ -157,6 +162,7 @@ export async function createNewEntry(payload: NewEntryPayload): Promise<ApiRespo
       voedingstype,
       vasteGram,
       voedingssubtype,
+      temperatuur,
     }, localDemoEntries.length);
 
     localDemoEntries = [newEntry, ...localDemoEntries];
@@ -210,6 +216,7 @@ export async function createNewEntry(payload: NewEntryPayload): Promise<ApiRespo
       voedingstype,
       vasteGram,
       voedingssubtype,
+      temperatuur,
     });
 
     return {

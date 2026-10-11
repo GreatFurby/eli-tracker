@@ -116,6 +116,18 @@ export function generateDemoData(): BabyEntry[] {
     ''
   ]);
 
+  // Today 09:10 - Temperature 36.5°C
+  rawRows.push([
+    `${today} 09:10:00`,
+    today,
+    '09:10',
+    '', '', '', '',
+    'Rectaal gemeten',
+    '', '',
+    '',
+    36.5,
+  ]);
+
   // ==========================================
   // 2. YESTERDAY's Events
   // ==========================================
@@ -137,6 +149,8 @@ export function generateDemoData(): BabyEntry[] {
   rawRows.push([`${yesterday} 18:30:00`, yesterday, '18:30', 160, '', '', 'Nee', '', 'Melk', '', '']);
   // Yesterday 21:15 - Milk 180ml
   rawRows.push([`${yesterday} 21:15:00`, yesterday, '21:15', 180, '', '', 'Nee', 'Voor het slapengaan', 'Melk', '', '']);
+  // Yesterday 09:15 - Temperature 36.7°C
+  rawRows.push([`${yesterday} 09:15:00`, yesterday, '09:15', '', '', '', '', 'Rectaal gemeten', '', '', '', 36.7]);
   // Yesterday Weight: 5.840g
   rawRows.push([`${yesterday} 09:00:00`, yesterday, '09:00', '', '', 5840, '', 'Gewogen bij Kind en Gezin', '', '', '']);
 

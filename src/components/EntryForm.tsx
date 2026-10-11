@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { EntryCategory, NewEntryPayload, SleepSession, SolidFoodSubtype } from '../types';
 import { createNewEntry } from '../services/apiService';
 import { SleepTracker } from './SleepTracker';
+import { formatTemperatureCelsius } from '../utils/normalization';
 import confetti from 'canvas-confetti';
 import {
   Calendar,
@@ -32,7 +33,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
   onSleepChanged,
   isSleepLoading,
 }) => {
-  // Category selection: Melk | Vaste voeding | Pamper | Gewicht
+  // Category selection: Melk | Vaste voeding | Pamper | Gewicht | Temperatuur
   const [category, setCategory] = useState<EntryCategory | null>(initialCategory || null);
 
   // Common Fields
@@ -67,6 +68,9 @@ export const EntryForm: React.FC<EntryFormProps> = ({
   // 4. Gewicht
   const [weightGrams, setWeightGrams] = useState<number>(5840);
 
+  // 5. Temperatuur — kept as text so Belgian decimals such as `36,5` work naturally.
+  const [temperatureCelsius, setTemperatureCelsius] = useState<string>('36,5');
+
   // State & Feedback
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
@@ -98,13 +102,36 @@ export const EntryForm: React.FC<EntryFormProps> = ({
     setTime(`${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`);
     setRemarks('');
     setVomited(false);
+    setTemperatureCelsius('36,5');
     setSaveSuccess(false);
     setErrorMessage('');
+  };
+
+  const parseTemperatureInput = (value: string): number | null => {
+    const normalized = value.trim().replace(',', '.');
+    if (!/^\d{2}(?:\.\d{1,2})?$/.test(normalized)) return null;
+    const parsed = Number(normalized);
+    if (!Number.isFinite(parsed) || parsed < 30 || parsed > 45) return null;
+    return Math.round(parsed * 10) / 10;
+  };
+
+  const adjustTemperature = (delta: number) => {
+    const current = parseTemperatureInput(temperatureCelsius) ?? 36.5;
+    const next = Math.max(30, Math.min(45, Math.round((current + delta) * 10) / 10));
+    setTemperatureCelsius(formatTemperatureCelsius(next, false));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!category || isSubmitting) return;
+
+    const parsedTemperature = category === 'temperatuur'
+      ? parseTemperatureInput(temperatureCelsius)
+      : null;
+    if (category === 'temperatuur' && parsedTemperature === null) {
+      setErrorMessage('Vul een geldige temperatuur tussen 30,0 en 45,0 °C in.');
+      return;
+    }
 
     setIsSubmitting(true);
     setErrorMessage('');
@@ -128,6 +155,8 @@ export const EntryForm: React.FC<EntryFormProps> = ({
       payload.diaper = diaperType;
     } else if (category === 'gewicht') {
       payload.weightGrams = Number(weightGrams) || 0;
+    } else if (category === 'temperatuur' && parsedTemperature !== null) {
+      payload.temperatureCelsius = parsedTemperature;
     }
 
     const res = await createNewEntry(payload);
@@ -229,6 +258,22 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                 <span className="text-[11px] text-slate-500">Meting in gram</span>
               </div>
             </button>
+
+            {/* Option 5: Temperatuur */}
+            <button
+              type="button"
+              id="select-category-temperatuur"
+              onClick={() => setCategory('temperatuur')}
+              className="col-span-2 p-4 rounded-2xl bg-gradient-to-br from-rose-50 to-white border-2 border-rose-100/90 shadow-sm flex items-center justify-center gap-3 text-left hover:border-rose-400 active:scale-95 transition-all group"
+            >
+              <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-700 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform shadow-xs">
+                🌡️
+              </div>
+              <div>
+                <span className="text-base font-bold text-slate-900 block">Temperatuur</span>
+                <span className="text-[11px] text-slate-500">Meting in °C</span>
+              </div>
+            </button>
           </div>
         </div>
       ) : (
@@ -251,12 +296,14 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                 {category === 'vaste_voeding' && '🥣'}
                 {category === 'pamper' && '💩'}
                 {category === 'gewicht' && '⚖️'}
+                {category === 'temperatuur' && '🌡️'}
               </span>
               <span className="text-sm font-bold text-slate-900">
                 {category === 'melk' && 'Melkvoeding'}
                 {category === 'vaste_voeding' && 'Vaste voeding'}
                 {category === 'pamper' && 'Pampercontrole'}
                 {category === 'gewicht' && 'Gewichtsmeting'}
+                {category === 'temperatuur' && 'Temperatuurmeting'}
               </span>
             </div>
           </div>
@@ -659,6 +706,68 @@ export const EntryForm: React.FC<EntryFormProps> = ({
             </div>
           )}
 
+          {/* 5. TEMPERATUUR SPECIFIC FIELDS */}
+          {category === 'temperatuur' && (
+            <div className="p-4 rounded-2xl bg-white border border-rose-100 shadow-sm space-y-4">
+              <div className="text-center space-y-2">
+                <label htmlFor="temperature-input" className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  Temperatuur in °C
+                </label>
+
+                <div className="flex items-center justify-center gap-4">
+                  <button
+                    type="button"
+                    onClick={() => adjustTemperature(-0.1)}
+                    className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-700 hover:bg-slate-200 active:scale-95 flex items-center justify-center text-lg font-bold transition-all"
+                    aria-label="0,1 graad lager"
+                  >
+                    <Minus className="w-5 h-5" />
+                  </button>
+
+                  <div className="flex items-baseline justify-center gap-1 min-w-36">
+                    <input
+                      id="temperature-input"
+                      type="text"
+                      inputMode="decimal"
+                      value={temperatureCelsius}
+                      onChange={(e) => setTemperatureCelsius(e.target.value)}
+                      aria-label="Temperatuur in graden Celsius"
+                      className="w-28 text-center text-4xl font-black text-slate-900 bg-transparent outline-none border-b-2 border-rose-400 focus:border-rose-600"
+                    />
+                    <span className="text-base font-bold text-slate-500">°C</span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => adjustTemperature(0.1)}
+                    className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-800 hover:bg-rose-200 active:scale-95 flex items-center justify-center text-lg font-bold transition-all"
+                    aria-label="0,1 graad hoger"
+                  >
+                    <Plus className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-center gap-1.5 pt-2">
+                  {[36.5, 37.0, 37.5, 38.0, 38.5].map((value) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setTemperatureCelsius(formatTemperatureCelsius(value, false))}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                        parseTemperatureInput(temperatureCelsius) === value
+                          ? 'bg-rose-600 text-white shadow-sm ring-2 ring-rose-200'
+                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      }`}
+                    >
+                      {formatTemperatureCelsius(value)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <p className="text-[11px] text-slate-500 text-center">Je mag een komma of punt gebruiken, bijvoorbeeld 36,5.</p>
+            </div>
+          )}
+
           {/* OPMERKINGEN (OPTIONAL TEXT) */}
           <div className="p-3.5 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-1.5">
             <label htmlFor="entry-remarks-input" className="block text-xs font-bold text-slate-700">
@@ -676,6 +785,8 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                   ? 'bijv. Met banaan en koekjesmeel...'
                   : category === 'pamper'
                   ? 'bijv. Veel pipi, lichte stoelgang...'
+                  : category === 'temperatuur'
+                  ? 'bijv. Rectaal gemeten, na een dutje...'
                   : 'bijv. Gewogen bij Kind en Gezin...'
               }
               className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-sky-500 outline-none"
@@ -722,6 +833,8 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                   ? 'bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-700 hover:to-orange-600 shadow-orange-500/20'
                   : category === 'pamper'
                   ? 'bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-700 hover:to-amber-600 shadow-amber-500/20'
+                  : category === 'temperatuur'
+                  ? 'bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-700 hover:to-rose-600 shadow-rose-500/20'
                   : 'bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600 shadow-emerald-500/20'
               } ${isSubmitting ? 'opacity-70 cursor-wait' : ''}`}
             >

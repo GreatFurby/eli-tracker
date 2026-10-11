@@ -91,6 +91,15 @@ export function parseNumberSafely(val: unknown): number | null {
   return isNaN(num) ? null : num;
 }
 
+/** Formats a temperature in the familiar Belgian decimal notation. */
+export function formatTemperatureCelsius(value: number, includeUnit = true): string {
+  const formatted = value.toLocaleString('nl-BE', {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  });
+  return includeUnit ? `${formatted} °C` : formatted;
+}
+
 /**
  * Formats a date string or Date into Belgian format: DD/MM/YYYY
  */
@@ -189,6 +198,9 @@ export function normalizeRecord(raw: any, index: number = 0): BabyEntry {
   const feedingTypeRaw = isArray ? raw[8] : (raw.voedingstype ?? raw.feedingType ?? raw['Voedingstype']);
   const solidGramsRaw = isArray ? raw[9] : (raw.vasteGram ?? raw.hoeveelheidVasteVoedingG ?? raw.solidFoodGrams ?? raw['Hoeveelheid vaste voeding (g)']);
   const solidSubtypeRaw = isArray ? raw[10] : (raw.voedingssubtype ?? raw.solidFoodSubtype ?? raw['Voedingssubtype']);
+  const temperatureRaw = isArray
+    ? raw[11]
+    : (raw.temperatuur ?? raw.temperatureCelsius ?? raw.temperature ?? raw['Temperatuur (°C)']);
 
   const isoDate = normalizeDateToIso(dateRaw || timestampRaw);
   const time24h = normalizeTimeTo24h(timeRaw || timestampRaw);
@@ -200,6 +212,10 @@ export function normalizeRecord(raw: any, index: number = 0): BabyEntry {
   const milkMl = parseNumberSafely(milkMlRaw);
   const weightGrams = parseNumberSafely(weightGramsRaw);
   const solidFoodGrams = parseNumberSafely(solidGramsRaw);
+  const parsedTemperature = parseNumberSafely(temperatureRaw);
+  const temperatureCelsius = parsedTemperature !== null && parsedTemperature >= 30 && parsedTemperature <= 45
+    ? parsedTemperature
+    : null;
 
   // Determine feeding type with historical fallback rule:
   // If milk amount is present and feedingType is blank, interpret as 'Melk'
@@ -251,6 +267,7 @@ export function normalizeRecord(raw: any, index: number = 0): BabyEntry {
     feedingType,
     solidFoodGrams,
     solidFoodSubtype,
+    temperatureCelsius,
   };
 }
 
@@ -332,12 +349,24 @@ export function calculateTodayStats(entries: BabyEntry[]): TodayStats {
       }
     : null;
 
+  // 6. Laatste temperatuurmeting
+  const latestTemperatureEntry = sortedDesc.find((entry) => entry.temperatureCelsius !== null) || null;
+  const lastTemperature = latestTemperatureEntry && latestTemperatureEntry.temperatureCelsius !== null
+    ? {
+        celsius: latestTemperatureEntry.temperatureCelsius,
+        time: latestTemperatureEntry.time,
+        dateTime: latestTemperatureEntry.dateTime,
+        timeAgo: formatTimeAgo(latestTemperatureEntry.dateTime),
+      }
+    : null;
+
   return {
     lastMilk,
     milkToday,
     solidFoodToday,
     lastDiaper,
     lastWeight,
+    lastTemperature,
     timelineToday: todayEntries,
   };
 }

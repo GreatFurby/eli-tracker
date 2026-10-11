@@ -7,7 +7,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { ActiveTab, BabyEntry, EntryCategory, SleepSession } from './types';
 import { fetchAllEntries, fetchAllSleepSessions } from './services/apiService';
 import { calculateTodayStats } from './utils/normalization';
-import { getActiveSleepSession } from './utils/sleep';
+import { getActiveSleepSession, getLatestCompletedSleepSession } from './utils/sleep';
 import { Header } from './components/Header';
 import { Navigation } from './components/Navigation';
 import { TodaySummaryCards } from './components/TodaySummaryCards';
@@ -92,6 +92,7 @@ export default function App() {
   }, [entries]);
 
   const activeSleep = useMemo(() => getActiveSleepSession(sleepSessions), [sleepSessions]);
+  const latestCompletedSleep = useMemo(() => getLatestCompletedSleepSession(sleepSessions), [sleepSessions]);
 
   // Quick Action Jump to Ingave with preselected category
   const handleQuickAdd = (category?: EntryCategory) => {
@@ -175,6 +176,7 @@ export default function App() {
                   stats={todayStats}
                   onQuickAdd={handleQuickAdd}
                   activeSleep={activeSleep}
+                  latestCompletedSleep={latestCompletedSleep}
                   onOpenSleep={() => handleQuickAdd()}
                 />
                 <TodayTimeline

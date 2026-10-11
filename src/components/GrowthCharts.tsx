@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { BabyEntry, SleepSession } from '../types';
-import { formatBelgianDate } from '../utils/normalization';
+import { formatBelgianDate, formatTemperatureCelsius } from '../utils/normalization';
 import { buildDailySummaries, formatDuration } from '../utils/sleep';
 import {
   ResponsiveContainer,
@@ -23,7 +23,7 @@ interface GrowthChartsProps {
   sleepSessions: SleepSession[];
 }
 
-type GrowthTab = 'gewicht' | 'melk' | 'vaste_voeding' | 'ontwikkeling' | 'slaap' | 'pampers';
+type GrowthTab = 'gewicht' | 'melk' | 'vaste_voeding' | 'ontwikkeling' | 'slaap' | 'pampers' | 'temperatuur';
 
 export const GrowthCharts: React.FC<GrowthChartsProps> = ({ entries, sleepSessions }) => {
   const [activeSubTab, setActiveSubTab] = useState<GrowthTab>('gewicht');
@@ -240,6 +240,37 @@ export const GrowthCharts: React.FC<GrowthChartsProps> = ({ entries, sleepSessio
     };
   }, [dailyDiaperData]);
 
+  // ==========================================
+  // 6. TEMPERATURE DATA
+  // ==========================================
+  const temperatureData = useMemo(() => {
+    return entries
+      .filter((entry) => entry.temperatureCelsius !== null)
+      .sort((a, b) => a.dateTime.getTime() - b.dateTime.getTime())
+      .slice(-30)
+      .map((entry) => ({
+        dateIso: entry.date,
+        displayDate: formatBelgianDate(entry.date).substring(0, 5),
+        fullDate: formatBelgianDate(entry.date),
+        time: entry.time,
+        temperatureCelsius: entry.temperatureCelsius as number,
+        remarks: entry.remarks,
+      }));
+  }, [entries]);
+
+  const temperatureStats = useMemo(() => {
+    if (temperatureData.length === 0) return null;
+    const values = temperatureData.map((entry) => entry.temperatureCelsius);
+    const total = values.reduce((sum, value) => sum + value, 0);
+    return {
+      latest: temperatureData[temperatureData.length - 1],
+      average: total / values.length,
+      min: Math.min(...values),
+      max: Math.max(...values),
+      count: values.length,
+    };
+  }, [temperatureData]);
+
   return (
     <section id="growth-charts-section" className="space-y-4 max-w-md mx-auto">
       {/* Section Title */}
@@ -315,6 +346,17 @@ export const GrowthCharts: React.FC<GrowthChartsProps> = ({ entries, sleepSessio
           }`}
         >
           🩲 Pampers
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveSubTab('temperatuur')}
+          className={`col-span-3 py-2 text-[11px] font-bold rounded-xl transition-all ${
+            activeSubTab === 'temperatuur'
+              ? 'bg-white text-slate-900 shadow-xs'
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          🌡️ Temperatuur
         </button>
       </div>
 
@@ -715,13 +757,7 @@ export const GrowthCharts: React.FC<GrowthChartsProps> = ({ entries, sleepSessio
               </div>
               <div className="h-64 w-full pt-2">
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={dailySleepData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="sleepGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#6366f1" stopOpacity={0.32} />
-                        <stop offset="95%" stopColor="#6366f1" stopOpacity={0.02} />
-                      </linearGradient>
-                    </defs>
+                  <BarChart data={dailySleepData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
                     <XAxis dataKey="displayDate" tick={{ fontSize: 9, fill: '#64748b' }} tickLine={false} />
                     <YAxis tick={{ fontSize: 10, fill: '#64748b' }} tickLine={false} axisLine={false} />
@@ -732,8 +768,8 @@ export const GrowthCharts: React.FC<GrowthChartsProps> = ({ entries, sleepSessio
                       }
                       return null;
                     }} />
-                    <Area type="monotone" dataKey="hours" stroke="#4f46e5" strokeWidth={3} fill="url(#sleepGradient)" dot={{ fill: '#4f46e5', stroke: '#fff', strokeWidth: 2, r: 3 }} activeDot={{ r: 5 }} />
-                  </AreaChart>
+                    <Bar dataKey="hours" fill="#4f46e5" radius={[6, 6, 0, 0]} />
+                  </BarChart>
                 </ResponsiveContainer>
               </div>
               {sleepStats?.hasOngoingSleep && <p className="text-[10px] text-indigo-700 text-center font-semibold">De huidige dag bevat een lopende slaapperiode tot nu, geen voltooid totaal.</p>}
@@ -742,7 +778,64 @@ export const GrowthCharts: React.FC<GrowthChartsProps> = ({ entries, sleepSessio
         </div>
       )}
 
-      {/* 6. PAMPERS TAB */}
+      {/* 6. TEMPERATUUR TAB */}
+      {activeSubTab === 'temperatuur' && (
+        <div className="space-y-3 animate-in fade-in duration-200">
+          {temperatureStats ? (
+            <>
+              <div className="grid grid-cols-2 gap-2.5">
+                <div className="p-3.5 rounded-2xl bg-white border border-rose-100 shadow-xs">
+                  <div className="text-[10px] font-bold text-rose-800 uppercase tracking-wider">Laatste meting</div>
+                  <div className="text-xl font-black text-slate-900 mt-0.5">{formatTemperatureCelsius(temperatureStats.latest.temperatureCelsius)}</div>
+                  <div className="text-[11px] text-slate-500 font-medium">{temperatureStats.latest.fullDate} · {temperatureStats.latest.time}</div>
+                </div>
+                <div className="p-3.5 rounded-2xl bg-white border border-rose-100 shadow-xs">
+                  <div className="text-[10px] font-bold text-rose-800 uppercase tracking-wider">Gemiddelde</div>
+                  <div className="text-xl font-black text-rose-700 mt-0.5">{formatTemperatureCelsius(temperatureStats.average)}</div>
+                  <div className="text-[11px] text-slate-500 font-medium">{formatTemperatureCelsius(temperatureStats.min)} – {formatTemperatureCelsius(temperatureStats.max)} · {temperatureStats.count} meting{temperatureStats.count === 1 ? '' : 'en'}</div>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-xs space-y-2">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                  <div><span className="text-xs font-bold text-slate-800 block">Temperatuurverloop</span><span className="text-[10px] text-slate-400">Laatste 30 metingen</span></div>
+                  <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-1 rounded-lg">°C</span>
+                </div>
+                <div className="h-64 w-full pt-2">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={temperatureData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                      <XAxis dataKey="displayDate" tick={{ fontSize: 9, fill: '#64748b' }} tickLine={false} interval="preserveStartEnd" />
+                      <YAxis
+                        domain={[
+                          Math.floor((temperatureStats.min - 0.3) * 10) / 10,
+                          Math.ceil((temperatureStats.max + 0.3) * 10) / 10,
+                        ]}
+                        tickFormatter={(value) => String(value).replace('.', ',')}
+                        tick={{ fontSize: 10, fill: '#64748b' }}
+                        tickLine={false}
+                        axisLine={false}
+                      />
+                      <Tooltip content={({ active, payload }) => {
+                        if (active && payload && payload.length) {
+                          const data = payload[0].payload;
+                          return <div className="p-2.5 bg-slate-900 text-white rounded-xl text-xs space-y-1 shadow-lg"><div className="font-bold">{data.fullDate} · {data.time}</div><div className="text-rose-300 font-mono font-bold text-sm">🌡️ {formatTemperatureCelsius(data.temperatureCelsius)}</div>{data.remarks && <div className="text-[10px] text-slate-300 border-t border-slate-700 pt-1 mt-1 italic">&quot;{data.remarks}&quot;</div>}</div>;
+                        }
+                        return null;
+                      }} />
+                      <Line type="monotone" dataKey="temperatureCelsius" stroke="#e11d48" strokeWidth={3} dot={{ fill: '#e11d48', stroke: '#fff', strokeWidth: 2, r: 4 }} activeDot={{ r: 6, fill: '#be123c' }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="p-5 rounded-2xl bg-white border border-slate-200 text-center"><div className="text-3xl mb-2">🌡️</div><p className="text-sm font-semibold text-slate-700">Nog geen temperatuurmetingen</p><p className="text-xs text-slate-400 mt-1">Nieuwe metingen verschijnen hier als een temperatuurverloop.</p></div>
+          )}
+        </div>
+      )}
+
+      {/* 7. PAMPERS TAB */}
       {activeSubTab === 'pampers' && (
         <div className="space-y-3 animate-in fade-in duration-200">
           {diaperStats ? (

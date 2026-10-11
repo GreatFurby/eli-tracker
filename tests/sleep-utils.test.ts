@@ -7,6 +7,7 @@ import {
   getSleepMinutes,
   splitSleepSessionByDay,
 } from '../src/utils/sleep';
+import { normalizeRecord } from '../src/utils/normalization';
 
 const overnight: SleepSession = {
   id: 'overnight',
@@ -48,6 +49,7 @@ const entry: BabyEntry = {
   feedingType: 'Melk',
   solidFoodGrams: null,
   solidFoodSubtype: null,
+  temperatureCelsius: 36.5,
 };
 
 const daily = buildDailySummary('2026-10-10', [entry], [overnight]);
@@ -55,6 +57,8 @@ assert.equal(daily.milkMl, 150);
 assert.equal(daily.diaperCount, 1, 'a mixed diaper counts once in the total');
 assert.equal(daily.diaperMixed, 1);
 assert.equal(daily.sleepMinutes, 30);
+assert.equal(daily.temperatureCount, 1);
+assert.equal(daily.averageTemperatureCelsius, 36.5);
 
 const weekly = buildWeeklySummary(new Date(2026, 9, 10), [entry], [overnight]);
 assert.equal(formatIsoDateLocal(weekly.weekStart), '2026-10-05', 'ISO weeks begin on Monday');
@@ -62,5 +66,15 @@ assert.equal(weekly.isoWeek, 41);
 assert.equal(weekly.milkMl, 150);
 assert.equal(weekly.diaperCount, 1);
 assert.equal(weekly.sleepMinutes, 120, 'weekly totals include both overnight portions exactly once');
+assert.equal(weekly.averageTemperatureCelsius, 36.5);
+
+const migratedTemperature = normalizeRecord([
+  '11/10/2026 08:30:00',
+  '11/10/2026',
+  '08:30',
+  '', '', '', '', '', '', '', '',
+  '36,5',
+]);
+assert.equal(migratedTemperature.temperatureCelsius, 36.5, 'Belgian comma temperature values are parsed');
 
 console.log('sleep-utils tests passed');

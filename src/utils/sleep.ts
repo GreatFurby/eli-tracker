@@ -20,6 +20,8 @@ export interface DailySummary {
   diaperMixed: number;
   diaperClean: number;
   weightCount: number;
+  temperatureCount: number;
+  averageTemperatureCelsius: number | null;
   sleepMinutes: number;
   hasOngoingSleep: boolean;
 }
@@ -34,6 +36,8 @@ export interface WeeklySummary {
   solidFoodGrams: number;
   diaperCount: number;
   sleepMinutes: number;
+  temperatureCount: number;
+  averageTemperatureCelsius: number | null;
   hasOngoingSleep: boolean;
 }
 
@@ -179,6 +183,13 @@ export function getActiveSleepSession(sessions: SleepSession[]): SleepSession | 
     .sort((a, b) => b.start.getTime() - a.start.getTime())[0] || null;
 }
 
+/** Returns the most recently completed sleep session for the Vandaag tile. */
+export function getLatestCompletedSleepSession(sessions: SleepSession[]): SleepSession | null {
+  return [...sessions]
+    .filter((session): session is SleepSession & { end: Date } => Boolean(session.end))
+    .sort((a, b) => b.end.getTime() - a.end.getTime())[0] || null;
+}
+
 export function getSleepMinutes(session: SleepSession, now = new Date()): number {
   const end = session.end || now;
   return Math.max(0, Math.round((end.getTime() - session.start.getTime()) / MINUTE_MS));
@@ -244,6 +255,8 @@ function createEmptyDailySummary(date: string): DailySummary {
     diaperMixed: 0,
     diaperClean: 0,
     weightCount: 0,
+    temperatureCount: 0,
+    averageTemperatureCelsius: null,
     sleepMinutes: 0,
     hasOngoingSleep: false,
   };
@@ -258,6 +271,7 @@ export function buildDailySummary(
 ): DailySummary {
   const summary = createEmptyDailySummary(date);
 
+  let temperatureTotal = 0;
   entries.filter((entry) => entry.date === date).forEach((entry) => {
     if ((entry.feedingType === 'Melk' || (entry.milkMl || 0) > 0) && entry.milkMl) {
       summary.milkMl += entry.milkMl;
@@ -273,7 +287,15 @@ export function buildDailySummary(
       else if (entry.diaper === 'Propere pamper') summary.diaperClean += 1;
     }
     if ((entry.weightGrams || 0) > 0) summary.weightCount += 1;
+    if (entry.temperatureCelsius !== null) {
+      summary.temperatureCount += 1;
+      temperatureTotal += entry.temperatureCelsius;
+    }
   });
+
+  if (summary.temperatureCount > 0) {
+    summary.averageTemperatureCelsius = temperatureTotal / summary.temperatureCount;
+  }
 
   sleepSessions.forEach((session) => {
     splitSleepSessionByDay(session, now).forEach((segment) => {
@@ -336,6 +358,11 @@ export function buildWeeklySummary(
     return buildDailySummary(date, entries, sleepSessions, now);
   });
   const { week, year } = getIsoWeekNumber(weekStart);
+  const temperatureCount = days.reduce((total, day) => total + day.temperatureCount, 0);
+  const temperatureTotal = days.reduce(
+    (total, day) => total + ((day.averageTemperatureCelsius || 0) * day.temperatureCount),
+    0,
+  );
   return {
     weekStart,
     weekEnd: addLocalDays(weekStart, 6),
@@ -346,6 +373,8 @@ export function buildWeeklySummary(
     solidFoodGrams: days.reduce((total, day) => total + day.solidFoodGrams, 0),
     diaperCount: days.reduce((total, day) => total + day.diaperCount, 0),
     sleepMinutes: days.reduce((total, day) => total + day.sleepMinutes, 0),
+    temperatureCount,
+    averageTemperatureCelsius: temperatureCount > 0 ? temperatureTotal / temperatureCount : null,
     hasOngoingSleep: days.some((day) => day.hasOngoingSleep),
   };
 }
