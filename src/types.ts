@@ -42,23 +42,9 @@ export interface SleepSession {
 
 export type EntryCategory = 'melk' | 'vaste_voeding' | 'pamper' | 'gewicht' | 'temperatuur';
 
-export interface NewEntryPayload {
-  category: EntryCategory;
-  date: string; // YYYY-MM-DD
-  time: string; // HH:mm
-  milkMl?: number;
-  solidFoodGrams?: number;
-  solidFoodSubtype?: SolidFoodSubtype;
-  diaper?: 'Pipi pamper' | 'Kaka pamper' | 'Pipi + kaka pamper';
-  weightGrams?: number;
-  temperatureCelsius?: number;
-  vomited?: boolean;
-  remarks?: string;
-}
-
 export type ActiveTab = 'vandaag' | 'ingave' | 'historiek' | 'groei';
 
-export interface TodayStats {
+export interface TodayStats<T extends BabyEntry = BabyEntry> {
   lastMilk: {
     ml: number;
     time: string;
@@ -92,5 +78,5 @@ export interface TodayStats {
     dateTime: Date;
     timeAgo: string;
   } | null;
-  timelineToday: BabyEntry[];
+  timelineToday: T[];
 }

@@ -9,6 +9,8 @@ import {
 } from '../src/utils/sleep';
 import { normalizeRecord } from '../src/utils/normalization';
 
+process.env.TZ = 'Europe/Brussels';
+
 const overnight: SleepSession = {
   id: 'overnight',
   start: new Date(2026, 9, 10, 23, 30),

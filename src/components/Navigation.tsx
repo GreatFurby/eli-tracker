@@ -4,10 +4,11 @@ import { Home, PlusCircle, History, TrendingUp } from 'lucide-react';
 
 interface NavigationProps {
   activeTab: ActiveTab;
+  readOnly?: boolean;
   setActiveTab: (tab: ActiveTab) => void;
 }
 
-export const Navigation: React.FC<NavigationProps> = ({ activeTab, setActiveTab }) => {
+export const Navigation: React.FC<NavigationProps> = ({ activeTab, setActiveTab, readOnly }) => {
   const tabs = [
     {
       id: 'vandaag' as ActiveTab,
@@ -43,7 +44,7 @@ export const Navigation: React.FC<NavigationProps> = ({ activeTab, setActiveTab 
       className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200/80 shadow-[0_-4px_16px_rgba(0,0,0,0.04)]"
     >
       <div className="max-w-md mx-auto px-4 h-16 flex items-center justify-around">
-        {tabs.map((tab) => {
+        {tabs.filter((tab) => !readOnly || tab.id !== 'ingave').map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
 

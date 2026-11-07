@@ -1,0 +1,16 @@
+{
+  "id": "./?mode=controller",
+  "name": "Eli Tracker – Beheer",
+  "short_name": "Beheer",
+  "description": "Voeding, slaap, pampers, temperatuur en groei voor Eli.",
+  "lang": "nl-BE",
+  "start_url": "./?mode=controller",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#f8fafc",
+  "icons": [
+    { "src": "./icons/eli-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "./icons/eli-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

@@ -89,7 +89,8 @@ export function localInputsToDate(date: string, time: string): Date | null {
     parsed.getMonth() !== month ||
     parsed.getDate() !== day ||
     parsed.getHours() !== hour ||
-    parsed.getMinutes() !== minute
+    parsed.getMinutes() !== minute ||
+    parsed.getSeconds() !== second
   ) {
     return null;
   }
@@ -177,7 +178,7 @@ export function normalizeSleepRecord(raw: unknown, index = 0): SleepSession | nu
   };
 }
 
-export function getActiveSleepSession(sessions: SleepSession[]): SleepSession | null {
+export function getActiveSleepSession<T extends SleepSession>(sessions: T[]): T | null {
   return [...sessions]
     .filter((session) => !session.end)
     .sort((a, b) => b.start.getTime() - a.start.getTime())[0] || null;
@@ -202,6 +203,7 @@ export function splitSleepSessionByDay(session: SleepSession, now = new Date()):
 
   const segments: SleepSegment[] = [];
   let cursor = new Date(session.start.getTime());
+  let counted = 0;
   while (cursor.getTime() < effectiveEnd.getTime()) {
     const nextMidnight = new Date(
       cursor.getFullYear(),
@@ -213,18 +215,18 @@ export function splitSleepSessionByDay(session: SleepSession, now = new Date()):
       0,
     );
     const segmentEnd = new Date(Math.min(nextMidnight.getTime(), effectiveEnd.getTime()));
-    const minutes = Math.round((segmentEnd.getTime() - cursor.getTime()) / MINUTE_MS);
-    if (minutes > 0) {
-      segments.push({
-        sessionId: session.id,
-        date: formatIsoDateLocal(cursor),
-        start: new Date(cursor.getTime()),
-        end: segmentEnd,
-        minutes,
-        remarks: session.remarks,
-        isOngoing: !session.end,
-      });
-    }
+    // Round the cumulative time so per-day totals add up to the full duration.
+    const elapsed = Math.round((segmentEnd.getTime() - session.start.getTime()) / MINUTE_MS);
+    segments.push({
+      sessionId: session.id,
+      date: formatIsoDateLocal(cursor),
+      start: cursor,
+      end: segmentEnd,
+      minutes: elapsed - counted,
+      remarks: session.remarks,
+      isOngoing: !session.end,
+    });
+    counted = elapsed;
     cursor = segmentEnd;
   }
   return segments;

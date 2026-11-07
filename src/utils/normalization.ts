@@ -274,8 +274,7 @@ export function normalizeRecord(raw: any, index: number = 0): BabyEntry {
 /**
  * Computes all today stats, summary cards and timeline
  */
-export function calculateTodayStats(entries: BabyEntry[]): TodayStats {
-  const now = new Date();
+export function calculateTodayStats<T extends BabyEntry>(entries: T[], now = new Date()): TodayStats<T> {
   const todayIso = formatIsoDate(now);
 
   // Sort entries descending (newest first)

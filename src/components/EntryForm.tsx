@@ -1,118 +1,77 @@
-import React, { useState, useEffect } from 'react';
-import { EntryCategory, NewEntryPayload, SleepSession, SolidFoodSubtype } from '../types';
-import { createNewEntry } from '../services/apiService';
+import React, { useState } from 'react';
+import type { DiaperType, EntryCategory, SolidFoodSubtype } from '../types';
+import type { EntryFields, SleepFields } from '../services/localDatabase';
+import type { LocalEntry, LocalSleep } from '../services/protocol';
 import { SleepTracker } from './SleepTracker';
 import { formatTemperatureCelsius } from '../utils/normalization';
+import { formatIsoDateLocal, formatLocalTime } from '../utils/sleep';
 import confetti from 'canvas-confetti';
 import {
   Calendar,
   Clock,
-  CheckCircle2,
   AlertCircle,
   Plus,
   Minus,
-  Sparkles,
   Loader2,
   ArrowLeft,
 } from 'lucide-react';
 
 interface EntryFormProps {
   initialCategory?: EntryCategory;
+  editing?: LocalEntry;
+  onSave: (fields: EntryFields) => Promise<void>;
   onEntrySaved: () => void;
-  onCancel?: () => void;
-  sleepSessions: SleepSession[];
-  onSleepChanged: () => void | Promise<void>;
-  isSleepLoading?: boolean;
+  onCancel: () => void;
+  onDelete?: () => Promise<void>;
+  sleepSessions?: LocalSleep[];
+  onSaveSleep?: (fields: SleepFields, session?: LocalSleep) => Promise<void>;
 }
 
 export const EntryForm: React.FC<EntryFormProps> = ({
   initialCategory,
+  editing,
+  onSave,
   onEntrySaved,
   onCancel,
+  onDelete,
   sleepSessions,
-  onSleepChanged,
-  isSleepLoading,
+  onSaveSleep,
 }) => {
-  // Category selection: Melk | Vaste voeding | Pamper | Gewicht | Temperatuur
-  const [category, setCategory] = useState<EntryCategory | null>(initialCategory || null);
+  const [category, setCategory] = useState<EntryCategory | null>(initialCategory ?? null);
+  const [date, setDate] = useState(() => editing?.date ?? formatIsoDateLocal(new Date()));
+  const [time, setTime] = useState(() => editing?.time ?? formatLocalTime(new Date()));
+  const [remarks, setRemarks] = useState(editing?.remarks ?? '');
+  const [vomited, setVomited] = useState(editing?.vomited ?? false);
+  const [milkMl, setMilkMl] = useState(editing ? editing.milkMl : 150);
+  const [solidGrams, setSolidGrams] = useState(editing ? editing.solidFoodGrams : 90);
+  const existingSubtype = editing?.solidFoodSubtype ?? '';
+  const standardSubtype = ['Fruitpap', 'Groentepap', 'Andere'].includes(existingSubtype);
+  const [solidSubtype, setSolidSubtype] = useState<SolidFoodSubtype>(
+    editing ? (standardSubtype ? existingSubtype : 'Andere') : 'Fruitpap',
+  );
+  const [customSubtype, setCustomSubtype] = useState(standardSubtype ? '' : existingSubtype);
+  const [diaperType, setDiaperType] = useState<DiaperType>(editing?.diaper ?? 'Pipi pamper');
+  const [weightGrams, setWeightGrams] = useState(editing ? editing.weightGrams : 5840);
+  const [temperatureCelsius, setTemperatureCelsius] = useState(
+    editing?.temperatureCelsius == null ? '36,5' : String(editing.temperatureCelsius).replace('.', ','),
+  );
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
-  // Common Fields
-  const [date, setDate] = useState<string>(() => {
-    const d = new Date();
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${day}`;
-  });
-
-  const [time, setTime] = useState<string>(() => {
-    const d = new Date();
-    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-  });
-
-  const [remarks, setRemarks] = useState<string>('');
-  const [vomited, setVomited] = useState<boolean>(false);
-
-  // Category-specific fields
-  // 1. Melk
-  const [milkMl, setMilkMl] = useState<number>(150);
-
-  // 2. Vaste voeding
-  const [solidSubtype, setSolidSubtype] = useState<SolidFoodSubtype>('Fruitpap');
-  const [customSubtype, setCustomSubtype] = useState<string>('');
-  const [solidGrams, setSolidGrams] = useState<number>(90);
-
-  // 3. Pamper
-  const [diaperType, setDiaperType] = useState<'Pipi pamper' | 'Kaka pamper' | 'Pipi + kaka pamper'>('Pipi pamper');
-
-  // 4. Gewicht
-  const [weightGrams, setWeightGrams] = useState<number>(5840);
-
-  // 5. Temperatuur — kept as text so Belgian decimals such as `36,5` work naturally.
-  const [temperatureCelsius, setTemperatureCelsius] = useState<string>('36,5');
-
-  // State & Feedback
-  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
-  const [errorMessage, setErrorMessage] = useState<string>('');
-
-  useEffect(() => {
-    if (initialCategory) {
-      setCategory(initialCategory);
-    }
-  }, [initialCategory]);
-
-  const triggerConfetti = () => {
-    try {
-      confetti({
-        particleCount: 40,
-        spread: 60,
-        origin: { y: 0.7 },
-        colors: ['#0ea5e9', '#14b8a6', '#f59e0b', '#10b981'],
-      });
-    } catch {
-      // Ignore if canvas-confetti fails
-    }
-  };
-
-  const handleResetForm = () => {
-    // Keep category or go back to picker
-    const now = new Date();
-    setDate(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`);
-    setTime(`${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`);
-    setRemarks('');
-    setVomited(false);
-    setTemperatureCelsius('36,5');
-    setSaveSuccess(false);
-    setErrorMessage('');
-  };
+  const milk = editing ? editing.milkMl !== null || editing.feedingType === 'Melk' : category === 'melk';
+  const solid = editing
+    ? editing.solidFoodGrams !== null || editing.feedingType === 'Vaste voeding' || editing.solidFoodSubtype !== null
+    : category === 'vaste_voeding';
+  const diaper = editing ? editing.diaper !== null : category === 'pamper';
+  const weight = editing ? editing.weightGrams !== null : category === 'gewicht';
+  const temperature = editing ? editing.temperatureCelsius !== null : category === 'temperatuur';
 
   const parseTemperatureInput = (value: string): number | null => {
     const normalized = value.trim().replace(',', '.');
-    if (!/^\d{2}(?:\.\d{1,2})?$/.test(normalized)) return null;
+    if (!/^\d{2}(?:\.\d+)?$/.test(normalized)) return null;
     const parsed = Number(normalized);
     if (!Number.isFinite(parsed) || parsed < 30 || parsed > 45) return null;
-    return Math.round(parsed * 10) / 10;
+    return parsed;
   };
 
   const adjustTemperature = (delta: number) => {
@@ -121,58 +80,50 @@ export const EntryForm: React.FC<EntryFormProps> = ({
     setTemperatureCelsius(formatTemperatureCelsius(next, false));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!category || isSubmitting) return;
+  async function commit(change: () => Promise<void>, celebrate = false) {
+    setIsSubmitting(true);
+    setErrorMessage('');
+    try {
+      await change();
+      if (celebrate) {
+        try {
+          void confetti({
+            particleCount: 40, spread: 60, origin: { y: 0.7 },
+            colors: ['#0ea5e9', '#14b8a6', '#f59e0b', '#10b981'],
+          });
+        } catch {
+          // Saving already succeeded if the animation is unavailable.
+        }
+      }
+      onEntrySaved();
+    } catch (error) {
+      setErrorMessage((error as Error).message || 'De ingave kon niet worden opgeslagen. Probeer opnieuw.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
 
-    const parsedTemperature = category === 'temperatuur'
-      ? parseTemperatureInput(temperatureCelsius)
-      : null;
-    if (category === 'temperatuur' && parsedTemperature === null) {
+  const handleSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+    if ((!editing && !category) || isSubmitting) return;
+    const parsedTemperature = temperature ? parseTemperatureInput(temperatureCelsius) : null;
+    if (temperature && parsedTemperature === null) {
       setErrorMessage('Vul een geldige temperatuur tussen 30,0 en 45,0 °C in.');
       return;
     }
-
-    setIsSubmitting(true);
-    setErrorMessage('');
-
-    const resolvedSubtype = solidSubtype === 'Andere' && customSubtype.trim() ? customSubtype.trim() : solidSubtype;
-
-    const payload: NewEntryPayload = {
-      category,
-      date,
-      time,
-      remarks: remarks.trim(),
-      vomited,
-    };
-
-    if (category === 'melk') {
-      payload.milkMl = Number(milkMl) || 0;
-    } else if (category === 'vaste_voeding') {
-      payload.solidFoodGrams = Number(solidGrams) || 0;
-      payload.solidFoodSubtype = resolvedSubtype;
-    } else if (category === 'pamper') {
-      payload.diaper = diaperType;
-    } else if (category === 'gewicht') {
-      payload.weightGrams = Number(weightGrams) || 0;
-    } else if (category === 'temperatuur' && parsedTemperature !== null) {
-      payload.temperatureCelsius = parsedTemperature;
-    }
-
-    const res = await createNewEntry(payload);
-
-    if (res.success) {
-      triggerConfetti();
-      setSaveSuccess(true);
-      setTimeout(() => {
-        setIsSubmitting(false);
-        handleResetForm();
-        onEntrySaved();
-      }, 1100);
-    } else {
-      setIsSubmitting(false);
-      setErrorMessage(res.error || 'De ingave kon niet worden opgeslagen. Probeer opnieuw.');
-    }
+    const resolvedSubtype = solidSubtype === 'Andere' ? customSubtype.trim() || 'Andere' : solidSubtype;
+    const subtype = solid && !(editing && !existingSubtype && solidSubtype === 'Andere' && !customSubtype.trim())
+      ? resolvedSubtype : null;
+    void commit(() => onSave({
+      date, time, remarks, vomited,
+      feedingType: editing ? editing.feedingType : milk ? 'Melk' : solid ? 'Vaste voeding' : null,
+      milkMl: milk ? milkMl : null,
+      solidFoodGrams: solid ? solidGrams : null,
+      solidFoodSubtype: subtype,
+      diaper: diaper ? diaperType : null,
+      weightGrams: weight ? weightGrams : null,
+      temperatureCelsius: parsedTemperature,
+    }), !editing);
   };
 
   const commonMilkOptions = [60, 90, 120, 150, 180, 210, 240];
@@ -180,14 +131,10 @@ export const EntryForm: React.FC<EntryFormProps> = ({
 
   return (
     <div id="entry-form-container" className="space-y-4 max-w-md mx-auto">
-      <SleepTracker
-        sleepSessions={sleepSessions}
-        onSleepChanged={onSleepChanged}
-        isLoading={isSleepLoading}
-      />
+      {sleepSessions && onSaveSleep && <SleepTracker sleepSessions={sleepSessions} onSave={onSaveSleep} />}
 
       {/* Category Selector if none picked */}
-      {!category ? (
+      {!category && !editing ? (
         <div className="space-y-4 pt-1 animate-in fade-in duration-200">
           <div className="text-center space-y-1">
             <h2 className="text-lg font-bold text-slate-900">Wat wil je registreren?</h2>
@@ -283,11 +230,12 @@ export const EntryForm: React.FC<EntryFormProps> = ({
           <div className="flex items-center justify-between pb-1 border-b border-slate-200/80">
             <button
               type="button"
-              onClick={() => setCategory(null)}
+              onClick={editing ? onCancel : () => setCategory(null)}
+              disabled={isSubmitting}
               className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 p-1 rounded-lg hover:bg-slate-100 transition-colors"
             >
               <ArrowLeft className="w-4 h-4" />
-              <span>Ander type</span>
+              <span>{editing ? 'Terug' : 'Ander type'}</span>
             </button>
 
             <div className="flex items-center gap-2">
@@ -299,6 +247,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                 {category === 'temperatuur' && '🌡️'}
               </span>
               <span className="text-sm font-bold text-slate-900">
+                {editing && 'Registratie bewerken'}
                 {category === 'melk' && 'Melkvoeding'}
                 {category === 'vaste_voeding' && 'Vaste voeding'}
                 {category === 'pamper' && 'Pampercontrole'}
@@ -342,7 +291,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
           </div>
 
           {/* 1. MELK SPECIFIC FIELDS */}
-          {category === 'melk' && (
+          {milk && (
             <div className="p-4 rounded-2xl bg-white border border-sky-100 shadow-sm space-y-4">
               <div className="text-center space-y-2">
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
@@ -351,7 +300,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                 <div className="flex items-center justify-center gap-4">
                   <button
                     type="button"
-                    onClick={() => setMilkMl(Math.max(10, milkMl - 10))}
+                    onClick={() => setMilkMl(Math.max(10, (milkMl ?? 0) - 10))}
                     className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-700 hover:bg-slate-200 active:scale-95 flex items-center justify-center text-lg font-bold transition-all"
                   >
                     <Minus className="w-5 h-5" />
@@ -360,9 +309,11 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                   <div className="flex items-baseline justify-center gap-1 min-w-32">
                     <input
                       type="number"
-                      inputMode="numeric"
-                      value={milkMl}
-                      onChange={(e) => setMilkMl(Number(e.target.value))}
+                      inputMode="decimal"
+                      min={0}
+                      step="any"
+                      value={milkMl ?? ''}
+                      onChange={(e) => setMilkMl(e.target.value === '' ? null : Number(e.target.value))}
                       className="w-24 text-center text-4xl font-black text-slate-900 bg-transparent outline-none border-b-2 border-sky-400 focus:border-sky-600"
                     />
                     <span className="text-base font-bold text-slate-500">ml</span>
@@ -370,7 +321,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
 
                   <button
                     type="button"
-                    onClick={() => setMilkMl(milkMl + 10)}
+                    onClick={() => setMilkMl((milkMl ?? 0) + 10)}
                     className="w-12 h-12 rounded-2xl bg-sky-100 text-sky-800 hover:bg-sky-200 active:scale-95 flex items-center justify-center text-lg font-bold transition-all"
                   >
                     <Plus className="w-5 h-5" />
@@ -430,7 +381,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
           )}
 
           {/* 2. VASTE VOEDING SPECIFIC FIELDS */}
-          {category === 'vaste_voeding' && (
+          {solid && (
             <div className="p-4 rounded-2xl bg-white border border-orange-100 shadow-sm space-y-4">
               {/* Soort voeding */}
               <div>
@@ -481,6 +432,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                 {solidSubtype === 'Andere' && (
                   <input
                     type="text"
+                    maxLength={50000}
                     value={customSubtype}
                     onChange={(e) => setCustomSubtype(e.target.value)}
                     placeholder="bijv. Broodkorst, Yoghurt..."
@@ -497,7 +449,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                 <div className="flex items-center justify-center gap-4">
                   <button
                     type="button"
-                    onClick={() => setSolidGrams(Math.max(5, solidGrams - 5))}
+                    onClick={() => setSolidGrams(Math.max(5, (solidGrams ?? 0) - 5))}
                     className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-700 hover:bg-slate-200 active:scale-95 flex items-center justify-center text-lg font-bold transition-all"
                   >
                     <Minus className="w-5 h-5" />
@@ -506,9 +458,11 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                   <div className="flex items-baseline justify-center gap-1 min-w-32">
                     <input
                       type="number"
-                      inputMode="numeric"
-                      value={solidGrams}
-                      onChange={(e) => setSolidGrams(Number(e.target.value))}
+                      inputMode="decimal"
+                      min={0}
+                      step="any"
+                      value={solidGrams ?? ''}
+                      onChange={(e) => setSolidGrams(e.target.value === '' ? null : Number(e.target.value))}
                       className="w-24 text-center text-4xl font-black text-slate-900 bg-transparent outline-none border-b-2 border-orange-400 focus:border-orange-600"
                     />
                     <span className="text-base font-bold text-slate-500">gram</span>
@@ -516,7 +470,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
 
                   <button
                     type="button"
-                    onClick={() => setSolidGrams(solidGrams + 5)}
+                    onClick={() => setSolidGrams((solidGrams ?? 0) + 5)}
                     className="w-12 h-12 rounded-2xl bg-orange-100 text-orange-800 hover:bg-orange-200 active:scale-95 flex items-center justify-center text-lg font-bold transition-all"
                   >
                     <Plus className="w-5 h-5" />
@@ -576,7 +530,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
           )}
 
           {/* 3. PAMPER SPECIFIC FIELDS */}
-          {category === 'pamper' && (
+          {diaper && (
             <div className="p-4 rounded-2xl bg-white border border-amber-100 shadow-sm space-y-3">
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
                 Pamper inhoud
@@ -626,11 +580,16 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                   <span className="text-xs font-bold">Pipi + kaka</span>
                 </button>
               </div>
+              {editing?.diaper === 'Propere pamper' && (
+                <button type="button" aria-pressed={diaperType === 'Propere pamper'} onClick={() => setDiaperType('Propere pamper')} className="w-full rounded-xl border border-slate-200 py-2 text-xs font-semibold text-slate-700 aria-pressed:bg-amber-100">
+                  Propere pamper
+                </button>
+              )}
             </div>
           )}
 
           {/* 4. GEWICHT SPECIFIC FIELDS */}
-          {category === 'gewicht' && (
+          {weight && (
             <div className="p-4 rounded-2xl bg-white border border-emerald-100 shadow-sm space-y-4">
               <div className="text-center space-y-2">
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
@@ -640,7 +599,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                 <div className="flex items-center justify-center gap-4">
                   <button
                     type="button"
-                    onClick={() => setWeightGrams(Math.max(1000, weightGrams - 50))}
+                    onClick={() => setWeightGrams(Math.max(1000, (weightGrams ?? 0) - 50))}
                     className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-700 hover:bg-slate-200 active:scale-95 flex items-center justify-center text-lg font-bold transition-all"
                   >
                     <Minus className="w-5 h-5" />
@@ -650,9 +609,11 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                     <div className="flex items-baseline justify-center gap-1">
                       <input
                         type="number"
-                        inputMode="numeric"
-                        value={weightGrams}
-                        onChange={(e) => setWeightGrams(Number(e.target.value))}
+                        inputMode="decimal"
+                      min={0}
+                      step="any"
+                        value={weightGrams ?? ''}
+                        onChange={(e) => setWeightGrams(e.target.value === '' ? null : Number(e.target.value))}
                         className="w-28 text-center text-4xl font-black text-slate-900 bg-transparent outline-none border-b-2 border-emerald-400 focus:border-emerald-600"
                       />
                       <span className="text-base font-bold text-slate-500">g</span>
@@ -664,7 +625,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
 
                   <button
                     type="button"
-                    onClick={() => setWeightGrams(weightGrams + 50)}
+                    onClick={() => setWeightGrams((weightGrams ?? 0) + 50)}
                     className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-800 hover:bg-emerald-200 active:scale-95 flex items-center justify-center text-lg font-bold transition-all"
                   >
                     <Plus className="w-5 h-5" />
@@ -675,28 +636,28 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                 <div className="flex items-center justify-center gap-2 pt-2">
                   <button
                     type="button"
-                    onClick={() => setWeightGrams(weightGrams - 10)}
+                    onClick={() => setWeightGrams((weightGrams ?? 0) - 10)}
                     className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 text-xs font-medium"
                   >
                     -10g
                   </button>
                   <button
                     type="button"
-                    onClick={() => setWeightGrams(weightGrams + 10)}
+                    onClick={() => setWeightGrams((weightGrams ?? 0) + 10)}
                     className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 text-xs font-medium"
                   >
                     +10g
                   </button>
                   <button
                     type="button"
-                    onClick={() => setWeightGrams(weightGrams + 50)}
+                    onClick={() => setWeightGrams((weightGrams ?? 0) + 50)}
                     className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-semibold border border-emerald-200"
                   >
                     +50g
                   </button>
                   <button
                     type="button"
-                    onClick={() => setWeightGrams(weightGrams + 100)}
+                    onClick={() => setWeightGrams((weightGrams ?? 0) + 100)}
                     className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-semibold border border-emerald-200"
                   >
                     +100g
@@ -707,7 +668,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
           )}
 
           {/* 5. TEMPERATUUR SPECIFIC FIELDS */}
-          {category === 'temperatuur' && (
+          {temperature && (
             <div className="p-4 rounded-2xl bg-white border border-rose-100 shadow-sm space-y-4">
               <div className="text-center space-y-2">
                 <label htmlFor="temperature-input" className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
@@ -773,9 +734,10 @@ export const EntryForm: React.FC<EntryFormProps> = ({
             <label htmlFor="entry-remarks-input" className="block text-xs font-bold text-slate-700">
               Opmerkingen <span className="text-slate-400 font-normal">(optioneel)</span>
             </label>
-            <input
+            <textarea
               id="entry-remarks-input"
-              type="text"
+              rows={2}
+              maxLength={50000}
               value={remarks}
               onChange={(e) => setRemarks(e.target.value)}
               placeholder={
@@ -801,14 +763,6 @@ export const EntryForm: React.FC<EntryFormProps> = ({
             </div>
           )}
 
-          {/* Success Feedback */}
-          {saveSuccess && (
-            <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs font-bold text-emerald-800 flex items-center justify-center gap-2 animate-in zoom-in-95 duration-150">
-              <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-              <span>Succesvol opgeslagen in Eli Tracker!</span>
-            </div>
-          )}
-
           {/* ACTION BUTTONS */}
           <div className="flex items-center gap-2.5 pt-2">
             {onCancel && (
@@ -825,7 +779,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
             <button
               id="submit-entry-btn"
               type="submit"
-              disabled={isSubmitting || saveSuccess}
+              disabled={isSubmitting}
               className={`flex-1 py-3.5 px-6 rounded-2xl font-bold text-sm text-white shadow-md flex items-center justify-center gap-2 transition-all active:scale-[0.98] ${
                 category === 'melk'
                   ? 'bg-gradient-to-r from-sky-600 to-sky-500 hover:from-sky-700 hover:to-sky-600 shadow-sky-500/20'
@@ -843,18 +797,20 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                   <Loader2 className="w-4 h-4 animate-spin" />
                   <span>Opslaan...</span>
                 </>
-              ) : saveSuccess ? (
-                <>
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Opgeslagen!</span>
-                </>
               ) : (
                 <>
-                  <span>Ingave opslaan</span>
+                  <span>{editing ? 'Opslaan' : 'Ingave opslaan'}</span>
                 </>
               )}
             </button>
           </div>
+          {onDelete && (
+            <button type="button" disabled={isSubmitting} onClick={() => {
+              if (window.confirm('Deze registratie verwijderen?')) void commit(onDelete);
+            }} className="w-full rounded-xl py-2 text-xs font-bold text-rose-700 hover:bg-rose-50">
+              Verwijderen
+            </button>
+          )}
         </form>
       )}
     </div>

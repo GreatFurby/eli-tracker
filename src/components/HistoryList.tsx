@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { BabyEntry, SleepSession } from '../types';
+import type { BabyEntry } from '../types';
+import type { LocalEntry, LocalSleep } from '../services/protocol';
+import { EditableCard } from './EditableCard';
 import { formatBelgianDate, formatDutchDateLabel, formatTemperatureCelsius, getDiaperUiInfo } from '../utils/normalization';
 import {
   buildDailySummary,
@@ -22,21 +24,23 @@ import {
 } from 'lucide-react';
 
 interface HistoryListProps {
-  entries: BabyEntry[];
-  sleepSessions: SleepSession[];
-  onOpenIngave: () => void;
+  entries: LocalEntry[];
+  sleepSessions: LocalSleep[];
+  onOpenIngave?: () => void;
+  onEditEntry?: (entry: LocalEntry) => void;
+  onEditSleep?: (session: LocalSleep) => void;
 }
 
 type FilterType = 'alles' | 'melk' | 'vaste_voeding' | 'pamper' | 'gewicht' | 'temperatuur' | 'slaap';
 type HistoryView = 'dag' | 'week';
 
 type HistoryEvent =
-  | { kind: 'entry'; date: string; dateTime: Date; entry: BabyEntry }
+  | { kind: 'entry'; date: string; dateTime: Date; entry: LocalEntry }
   | {
       kind: 'sleep';
       date: string;
       dateTime: Date;
-      sessionId: string;
+      session: LocalSleep;
       end: Date;
       minutes: number;
       remarks: string;
@@ -62,7 +66,7 @@ function SummaryCell({ label, value, emoji }: { label: string; value: string; em
   );
 }
 
-export const HistoryList: React.FC<HistoryListProps> = ({ entries, sleepSessions, onOpenIngave }) => {
+export const HistoryList: React.FC<HistoryListProps> = ({ entries, sleepSessions, onOpenIngave, onEditEntry, onEditSleep }) => {
   const [activeFilter, setActiveFilter] = useState<FilterType>('alles');
   const [searchQuery, setSearchQuery] = useState('');
   const [historyView, setHistoryView] = useState<HistoryView>('dag');
@@ -86,7 +90,7 @@ export const HistoryList: React.FC<HistoryListProps> = ({ entries, sleepSessions
         kind: 'sleep' as const,
         date: segment.date,
         dateTime: segment.start,
-        sessionId: segment.sessionId,
+        session,
         end: segment.end,
         minutes: segment.minutes,
         remarks: segment.remarks,
@@ -167,9 +171,9 @@ export const HistoryList: React.FC<HistoryListProps> = ({ entries, sleepSessions
               : `Week ${weeklySummary.isoWeek} · ${weeklySummary.isoYear}`}
           </p>
         </div>
-        <button type="button" onClick={onOpenIngave} className="px-3 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 active:scale-95 text-white text-xs font-semibold shadow-xs transition-all">
+        {onOpenIngave && <button type="button" onClick={onOpenIngave} className="px-3 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 active:scale-95 text-white text-xs font-semibold shadow-xs transition-all">
           + Nieuwe ingave
-        </button>
+        </button>}
       </div>
 
       <div className="grid grid-cols-2 gap-1 p-1 rounded-2xl bg-slate-100 border border-slate-200">
@@ -234,7 +238,7 @@ export const HistoryList: React.FC<HistoryListProps> = ({ entries, sleepSessions
                       if (event.kind === 'sleep') {
                         const isLivePart = event.isOngoing && event.date === formatIsoDateLocal(now);
                         return (
-                          <div key={`sleep-${event.sessionId}-${event.date}-${event.dateTime.getTime()}`} className="p-3.5 rounded-2xl bg-gradient-to-br from-indigo-50/80 to-white border border-indigo-100 shadow-xs space-y-2">
+                          <EditableCard key={`sleep-${event.session.id}-${event.date}`} className="p-3.5 rounded-2xl bg-gradient-to-br from-indigo-50/80 to-white border border-indigo-100 shadow-xs space-y-2" label={`Slaap om ${formatLocalTime(event.dateTime)} bewerken`} onEdit={onEditSleep && (() => onEditSleep(event.session))}>
                             <div className="flex items-start justify-between gap-2">
                               <div className="flex items-center gap-2.5 min-w-0">
                                 <span className="font-mono text-xs font-bold text-indigo-800 bg-indigo-100 px-2 py-0.5 rounded-md">{formatLocalTime(event.dateTime)}</span>
@@ -253,7 +257,7 @@ export const HistoryList: React.FC<HistoryListProps> = ({ entries, sleepSessions
                                 <p className="italic text-slate-700 leading-snug">{event.remarks}</p>
                               </div>
                             )}
-                          </div>
+                          </EditableCard>
                         );
                       }
 
@@ -265,12 +269,12 @@ export const HistoryList: React.FC<HistoryListProps> = ({ entries, sleepSessions
                       const isTemperature = entry.temperatureCelsius !== null;
                       const diaperInfo = isDiaper ? getDiaperUiInfo(entry.diaper) : null;
                       return (
-                        <div key={`entry-${entry.id}`} className="p-3.5 rounded-2xl bg-white border border-slate-200/90 shadow-xs hover:border-slate-300 transition-all space-y-2">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex items-center gap-2.5 min-w-0">
+                        <EditableCard key={`entry-${entry.id}`} className="p-3.5 rounded-2xl bg-white border border-slate-200/90 shadow-xs space-y-2" label={`Registratie om ${entry.time} bewerken`} onEdit={onEditEntry && (() => onEditEntry(entry))}>
+                          <div className="flex flex-wrap items-start justify-between gap-2">
+                            <div className="flex min-w-0 flex-wrap items-center gap-2">
                               <span className="font-mono text-xs font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md shrink-0">{entry.time}</span>
-                              {isMilk && <span className="text-sm font-bold text-slate-900 truncate">🍼 {entry.milkMl} ml melk</span>}
-                              {isSolid && <span className="text-sm font-bold text-slate-900 truncate">{entry.solidFoodSubtype === 'Groentepap' ? '🥔' : '🍎'} {entry.solidFoodGrams} g {entry.solidFoodSubtype || 'vaste voeding'}</span>}
+                              {isMilk && <span className="text-sm font-bold text-slate-900">🍼 {entry.milkMl} ml melk</span>}
+                              {isSolid && <span className="text-sm font-bold text-slate-900 break-words">{entry.solidFoodSubtype === 'Groentepap' ? '🥔' : '🍎'} {entry.solidFoodGrams} g {entry.solidFoodSubtype || 'vaste voeding'}</span>}
                               {isDiaper && diaperInfo && <span className={`text-xs font-bold px-2 py-0.5 rounded-md border ${diaperInfo.badgeColor}`}>{diaperInfo.icon} {diaperInfo.label}</span>}
                               {isWeight && <span className="text-xs font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">⚖️ {entry.weightGrams?.toLocaleString('nl-BE')} g</span>}
                               {isTemperature && <span className="text-xs font-bold text-rose-800 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200">🌡️ {formatTemperatureCelsius(entry.temperatureCelsius as number)}</span>}
@@ -278,7 +282,7 @@ export const HistoryList: React.FC<HistoryListProps> = ({ entries, sleepSessions
                             {entry.vomited && <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 shrink-0"><AlertCircle className="w-3 h-3 text-rose-500" /> Overgegeven</span>}
                           </div>
                           {entry.remarks && <div className="flex items-start gap-2 text-xs text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100"><MessageSquare className="w-3 h-3 text-slate-400 mt-0.5 shrink-0" /><p className="italic text-slate-700 leading-snug">{entry.remarks}</p></div>}
-                        </div>
+                        </EditableCard>
                       );
                     })}
                   </div>

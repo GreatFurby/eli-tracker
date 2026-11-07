@@ -6,10 +6,10 @@ import { Clock, Moon, Scale, TrendingUp } from 'lucide-react';
 
 interface TodaySummaryCardsProps {
   stats: TodayStats;
-  onQuickAdd: (category: EntryCategory) => void;
+  onQuickAdd?: (category: EntryCategory) => void;
   activeSleep: SleepSession | null;
   latestCompletedSleep: SleepSession | null;
-  onOpenSleep: () => void;
+  onOpenSleep?: () => void;
 }
 
 export const TodaySummaryCards: React.FC<TodaySummaryCardsProps> = ({
@@ -21,14 +21,15 @@ export const TodaySummaryCards: React.FC<TodaySummaryCardsProps> = ({
 }) => {
   const { lastMilk, milkToday, solidFoodToday, lastDiaper, lastWeight, lastTemperature } = stats;
   const diaperInfo = lastDiaper ? getDiaperUiInfo(lastDiaper.type) : null;
+  const Tile = onQuickAdd ? 'button' : 'div';
   const latestSleepEnd = latestCompletedSleep?.end || null;
 
   return (
     <section id="today-summary-section" aria-label="Overzicht Vandaag" className="space-y-3">
       <div className="grid grid-cols-2 gap-3">
-        <button
+        <Tile
           id="card-sleep"
-          type="button"
+          type={onQuickAdd ? 'button' : undefined}
           onClick={onOpenSleep}
           className={`min-h-[148px] text-left p-4 rounded-2xl border shadow-sm flex flex-col justify-between active:scale-[0.98] transition-all ${
             activeSleep
@@ -63,15 +64,15 @@ export const TodaySummaryCards: React.FC<TodaySummaryCardsProps> = ({
             )}
           </div>
 
-          <div className={`text-[11px] font-medium pt-1 border-t ${activeSleep ? 'border-white/15 text-indigo-100' : 'border-indigo-100/70 text-indigo-700'}`}>
+          {onOpenSleep && <div className={`text-[11px] font-medium pt-1 border-t ${activeSleep ? 'border-white/15 text-indigo-100' : 'border-indigo-100/70 text-indigo-700'}`}>
             {activeSleep ? 'Tik om slaap te stoppen' : 'Tik voor slaapregistratie'}
-          </div>
-        </button>
+          </div>}
+        </Tile>
 
-        <button
+        <Tile
           id="card-last-temperature"
-          type="button"
-          onClick={() => onQuickAdd('temperatuur')}
+          type={onQuickAdd ? 'button' : undefined}
+          onClick={onQuickAdd && (() => onQuickAdd('temperatuur'))}
           className="min-h-[148px] text-left p-4 rounded-2xl border border-rose-100 bg-gradient-to-br from-rose-50/80 to-white shadow-sm flex flex-col justify-between hover:border-rose-300 active:scale-[0.98] transition-all"
         >
           <div className="flex items-center justify-between gap-2">
@@ -95,15 +96,15 @@ export const TodaySummaryCards: React.FC<TodaySummaryCardsProps> = ({
             )}
           </div>
 
-          <div className="text-[11px] font-medium text-rose-700 pt-1 border-t border-rose-100/70">Tik om temperatuur in te geven</div>
-        </button>
+          {onQuickAdd && <div className="text-[11px] font-medium text-rose-700 pt-1 border-t border-rose-100/70">Tik om temperatuur in te geven</div>}
+        </Tile>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <button
+        <Tile
           id="card-last-milk"
-          type="button"
-          onClick={() => onQuickAdd('melk')}
+          type={onQuickAdd ? 'button' : undefined}
+          onClick={onQuickAdd && (() => onQuickAdd('melk'))}
           className="text-left bg-gradient-to-br from-sky-50/80 to-white p-4 rounded-2xl border border-sky-100/80 shadow-sm flex flex-col justify-between hover:border-sky-300 active:scale-[0.98] transition-all"
         >
           <div className="flex items-center justify-between">
@@ -118,13 +119,13 @@ export const TodaySummaryCards: React.FC<TodaySummaryCardsProps> = ({
               </>
             ) : <div className="text-xs text-slate-400 py-1">Nog geen melk geregistreerd</div>}
           </div>
-          <div className="text-[11px] font-medium text-sky-600/90 pt-1 border-t border-sky-100/60">{milkToday.count > 0 ? `${milkToday.count}e voeding vandaag` : 'Tik om toe te voegen'}</div>
-        </button>
+          <div className="text-[11px] font-medium text-sky-600/90 pt-1 border-t border-sky-100/60">{milkToday.count > 0 ? `${milkToday.count}e voeding vandaag` : onQuickAdd ? 'Tik om toe te voegen' : ''}</div>
+        </Tile>
 
-        <button
+        <Tile
           id="card-last-diaper"
-          type="button"
-          onClick={() => onQuickAdd('pamper')}
+          type={onQuickAdd ? 'button' : undefined}
+          onClick={onQuickAdd && (() => onQuickAdd('pamper'))}
           className="text-left bg-gradient-to-br from-amber-50/70 to-white p-4 rounded-2xl border border-amber-100/80 shadow-sm flex flex-col justify-between hover:border-amber-300 active:scale-[0.98] transition-all"
         >
           <div className="flex items-center justify-between"><span className="text-[11px] font-bold text-amber-900 uppercase tracking-wider">Laatste pamper</span><span className="w-6 h-6 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center text-xs">🩲</span></div>
@@ -136,38 +137,38 @@ export const TodaySummaryCards: React.FC<TodaySummaryCardsProps> = ({
               </>
             ) : <div className="text-xs text-slate-400 py-1">Nog geen pamper vandaag</div>}
           </div>
-          <div className="text-[11px] font-medium text-amber-700/90 pt-1 border-t border-amber-100/60">Tik voor nieuwe pamper</div>
-        </button>
+          {onQuickAdd && <div className="text-[11px] font-medium text-amber-700/90 pt-1 border-t border-amber-100/60">Tik voor nieuwe pamper</div>}
+        </Tile>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <button
+        <Tile
           id="card-today-milk-total"
-          type="button"
-          onClick={() => onQuickAdd('melk')}
+          type={onQuickAdd ? 'button' : undefined}
+          onClick={onQuickAdd && (() => onQuickAdd('melk'))}
           className="text-left bg-white p-4 rounded-2xl border border-slate-200/90 shadow-sm flex flex-col justify-between hover:border-sky-200 transition-all"
         >
           <div className="flex items-center justify-between"><span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Melk vandaag</span><span className="text-xs">🥛</span></div>
           <div className="my-1.5"><div className="text-xl font-black text-slate-900 tracking-tight">{milkToday.totalMl} <span className="text-xs font-semibold text-slate-500">ml</span></div><div className="text-xs font-medium text-slate-600 mt-0.5">{milkToday.count === 1 ? '1 voeding' : `${milkToday.count} voedingen`}</div></div>
           <div className="text-[10px] text-slate-400 font-medium">{milkToday.count > 0 ? `Gem. ~${Math.round(milkToday.totalMl / milkToday.count)} ml / fles` : 'Nog niet gedronken'}</div>
-        </button>
+        </Tile>
 
-        <button
+        <Tile
           id="card-today-solid-total"
-          type="button"
-          onClick={() => onQuickAdd('vaste_voeding')}
+          type={onQuickAdd ? 'button' : undefined}
+          onClick={onQuickAdd && (() => onQuickAdd('vaste_voeding'))}
           className="text-left bg-white p-4 rounded-2xl border border-slate-200/90 shadow-sm flex flex-col justify-between hover:border-orange-200 transition-all"
         >
           <div className="flex items-center justify-between"><span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Vaste voeding</span><span className="text-xs">🥣</span></div>
           <div className="my-1.5"><div className="text-xl font-black text-slate-900 tracking-tight">{solidFoodToday.totalGrams} <span className="text-xs font-semibold text-slate-500">g</span></div><div className="text-xs font-medium text-slate-600 mt-0.5 truncate">{solidFoodToday.count === 0 ? 'Geen vaste voeding' : solidFoodToday.count === 1 ? '1 maaltijd' : `${solidFoodToday.count} maaltijden`}</div></div>
           <div className="text-[10px] text-orange-600 font-medium truncate">{solidFoodToday.subtypes.length > 0 ? solidFoodToday.subtypes.join(', ') : 'Fruit- of groentepap'}</div>
-        </button>
+        </Tile>
       </div>
 
-      <button
+      <Tile
         id="card-last-weight"
-        type="button"
-        onClick={() => onQuickAdd('gewicht')}
+        type={onQuickAdd ? 'button' : undefined}
+        onClick={onQuickAdd && (() => onQuickAdd('gewicht'))}
         className="w-full text-left bg-gradient-to-r from-emerald-50/60 via-teal-50/40 to-white p-4 rounded-2xl border border-emerald-100 shadow-sm flex items-center justify-between hover:border-emerald-300 transition-all active:scale-[0.99]"
       >
         <div className="flex items-center gap-3">
@@ -185,7 +186,7 @@ export const TodaySummaryCards: React.FC<TodaySummaryCardsProps> = ({
             </>
           ) : <span className="text-xs text-slate-400">Nog niet gewogen</span>}
         </div>
-      </button>
+      </Tile>
     </section>
   );
 };

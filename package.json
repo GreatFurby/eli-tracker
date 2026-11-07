@@ -1,7 +1,7 @@
 {
-  "name": "react-example",
+  "name": "eli-tracker",
   "private": true,
-  "version": "0.0.0",
+  "version": "2.4.0",
   "type": "module",
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
@@ -9,16 +9,18 @@
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
-    "test:sleep": "TZ=Europe/Brussels tsx tests/sleep-utils.test.ts"
+    "test:sleep": "node --import tsx tests/sleep-utils.test.ts",
+    "test": "node --import tsx --test tests/sleep-utils.test.ts tests/offline.test.ts",
+    "test:backend": "node --import tsx --test tests/backend.test.ts",
+    "test:browser": "node --import tsx tests/browser-smoke.ts"
   },
   "dependencies": {
-    "@google/genai": "^2.4.0",
+    "@fontsource-variable/plus-jakarta-sans": "^5.3.0",
     "@tailwindcss/vite": "^4.1.14",
     "@types/canvas-confetti": "^1.9.0",
     "@vitejs/plugin-react": "^5.0.4",
     "canvas-confetti": "^1.9.4",
-    "dotenv": "^17.2.3",
-    "express": "^4.21.2",
+    "dexie": "^4.4.7",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
     "react": "^19.0.1",
@@ -28,12 +30,14 @@
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
     "autoprefixer": "^10.4.21",
     "esbuild": "^0.25.0",
+    "fake-indexeddb": "^6.2.7",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",
-    "vite": "^6.2.3",
-    "@types/express": "^4.17.21"
+    "vite": "^6.2.3"
   }
 }

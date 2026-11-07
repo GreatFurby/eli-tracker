@@ -1,21 +1,35 @@
 import React from 'react';
-import { BabyEntry, EntryCategory } from '../types';
+import type { EntryCategory } from '../types';
+import type { LocalEntry, LocalSleep } from '../services/protocol';
+import { formatDuration, formatIsoDateLocal, formatLocalTime, splitSleepSessionByDay } from '../utils/sleep';
+import { EditableCard } from './EditableCard';
 import { formatTemperatureCelsius, getDiaperUiInfo } from '../utils/normalization';
-import { Clock, AlertCircle, PlusCircle, MessageSquare } from 'lucide-react';
+import { AlertCircle, PlusCircle, MessageSquare } from 'lucide-react';
 
 interface TodayTimelineProps {
-  entries: BabyEntry[];
-  onOpenIngave: (category?: EntryCategory) => void;
+  entries: LocalEntry[];
+  sleepSessions: LocalSleep[];
+  now: Date;
+  onOpenIngave?: (category?: EntryCategory) => void;
+  onEditEntry?: (entry: LocalEntry) => void;
+  onEditSleep?: (session: LocalSleep) => void;
 }
 
 export const TodayTimeline: React.FC<TodayTimelineProps> = ({
   entries,
+  sleepSessions,
+  now,
   onOpenIngave,
+  onEditEntry,
+  onEditSleep,
 }) => {
-  // Sort chronological for today's timeline (earliest to latest)
-  const sortedChronological = [...entries].sort(
-    (a, b) => a.dateTime.getTime() - b.dateTime.getTime()
-  );
+  const today = formatIsoDateLocal(now);
+  const sortedChronological = [
+    ...entries.map((entry) => ({ kind: 'entry' as const, time: entry.dateTime, entry })),
+    ...sleepSessions.flatMap((session) => splitSleepSessionByDay(session, now)
+      .filter((segment) => segment.date === today)
+      .map((segment) => ({ kind: 'sleep' as const, time: segment.start, session, segment }))),
+  ].sort((left, right) => left.time.getTime() - right.time.getTime());
 
   return (
     <section id="today-timeline-section" aria-label="Tijdlijn vandaag" className="space-y-3 pt-2">
@@ -29,14 +43,14 @@ export const TodayTimeline: React.FC<TodayTimelineProps> = ({
           </span>
         </div>
 
-        <button
+        {onOpenIngave && <button
           type="button"
           onClick={() => onOpenIngave()}
           className="text-xs font-semibold text-sky-600 hover:text-sky-700 flex items-center gap-1 active:scale-95 transition-transform"
         >
           <PlusCircle className="w-3.5 h-3.5" />
           <span>Ingave</span>
-        </button>
+        </button>}
       </div>
 
       {sortedChronological.length === 0 ? (
@@ -50,10 +64,10 @@ export const TodayTimeline: React.FC<TodayTimelineProps> = ({
           <div>
             <h3 className="text-sm font-bold text-slate-900">Nog geen activiteiten vandaag</h3>
             <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto">
-              Begin de dag door Eli&apos;s eerste fles, pamper of fruitpapje te registreren.
+              {onOpenIngave ? 'Begin de dag door Eli’s eerste fles, pamper of fruitpapje te registreren.' : 'Hier verschijnen de gesynchroniseerde gebeurtenissen van vandaag.'}
             </p>
           </div>
-          <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+          {onOpenIngave && <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
             <button
               type="button"
               onClick={() => onOpenIngave('melk')}
@@ -82,11 +96,28 @@ export const TodayTimeline: React.FC<TodayTimelineProps> = ({
             >
               🌡️ Temperatuur
             </button>
-          </div>
+          </div>}
         </div>
       ) : (
         <div className="relative pl-6 space-y-3 before:absolute before:left-2.5 before:top-3 before:bottom-3 before:w-0.5 before:bg-slate-200">
-          {sortedChronological.map((entry, idx) => {
+          {sortedChronological.map((event) => {
+            if (event.kind === 'sleep') {
+              const { session, segment } = event;
+              const time = formatLocalTime(segment.start);
+              return (
+                <div key={`sleep-${session.id}`} className="relative">
+                  <span className="absolute -left-6 top-3 flex h-5 w-5 items-center justify-center rounded-full bg-indigo-600 text-[10px] ring-4 ring-slate-50">🌙</span>
+                  <EditableCard className="p-3.5 rounded-2xl bg-indigo-50 border border-indigo-100 shadow-xs space-y-1.5" label={`Slaap om ${time} bewerken`} onEdit={onEditSleep && (() => onEditSleep(session))}>
+                    <div className="flex items-center gap-2 text-xs font-bold text-indigo-900">
+                      <span className="rounded-md bg-indigo-100 px-2 py-0.5 font-mono">{time}</span>
+                      <span>Slaap · {formatDuration(segment.minutes)}{segment.isOngoing ? ' · Loopt nog' : ''}</span>
+                    </div>
+                    {session.remarks && <p className="text-xs italic text-slate-700">{session.remarks}</p>}
+                  </EditableCard>
+                </div>
+              );
+            }
+            const { entry } = event;
             const isMilk = entry.feedingType === 'Melk' || (entry.milkMl && entry.milkMl > 0);
             const isSolid = entry.feedingType === 'Vaste voeding' || (entry.solidFoodGrams && entry.solidFoodGrams > 0);
             const isDiaper = Boolean(entry.diaper);
@@ -118,8 +149,8 @@ export const TodayTimeline: React.FC<TodayTimelineProps> = ({
 
             return (
               <div
-                key={entry.id || idx}
-                id={`timeline-item-${entry.id || idx}`}
+                key={entry.id}
+                id={`timeline-item-${entry.id}`}
                 className="relative group"
               >
                 {/* Timeline node */}
@@ -130,9 +161,9 @@ export const TodayTimeline: React.FC<TodayTimelineProps> = ({
                 </div>
 
                 {/* Timeline card */}
-                <div className="p-3.5 rounded-2xl bg-white border border-slate-200/80 shadow-xs hover:border-slate-300 transition-all space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
+                <EditableCard className="p-3.5 rounded-2xl bg-white border border-slate-200/80 shadow-xs space-y-1.5" label={`Registratie om ${entry.time} bewerken`} onEdit={onEditEntry && (() => onEditEntry(entry))}>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex min-w-0 flex-wrap items-center gap-2">
                       <span className="font-mono text-xs font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded-md">
                         {entry.time}
                       </span>
@@ -191,7 +222,7 @@ export const TodayTimeline: React.FC<TodayTimelineProps> = ({
                       <p className="italic text-slate-700 leading-snug">{entry.remarks}</p>
                     </div>
                   )}
-                </div>
+                </EditableCard>
               </div>
             );
           })}
